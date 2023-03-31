@@ -17,6 +17,7 @@ import "@uniswap/v3-periphery/contracts/libraries/PoolAddress.sol";
 import "@uniswap/v3-periphery/contracts/libraries/LiquidityAmounts.sol";
 
 import "./interface/ITeaVaultV3Pair.sol";
+import {VaultUtils} from "./VaultUtils.sol";
 
 contract TeaVaultV3Pair is
     Initializable,
@@ -470,7 +471,7 @@ contract TeaVaultV3Pair is
         for (uint256 i; i < positions.length; i++) {
             Position storage position = positions[i];
             if (position.tickLower == _tickLower && position.tickUpper == _tickUpper) {
-                return _positionInfo(i);
+                return VaultUtils.positionInfo(address(this), pool, positions[i]);
             }
         }
 
@@ -481,92 +482,9 @@ contract TeaVaultV3Pair is
     function positionInfo(
         uint256 _index
     ) external override view returns (uint256 amount0, uint256 amount1, uint256 fee0, uint256 fee1) {
-        return _positionInfo(_index);
-    }
-
-    function _positionInfo(
-        uint256 _index
-    ) internal view returns (uint256 amount0, uint256 amount1, uint256 fee0, uint256 fee1) {
         if (_index >= positions.length) revert PositionNotExist();
-
-        Position storage position = positions[_index];
-        bytes32 positionKey = keccak256(abi.encodePacked(address(this), position.tickLower, position.tickUpper));
-        (uint160 sqrtPriceX96, int24 tick, , , , , ) = pool.slot0();
-        uint256 feeGrowthGlobal0X128 = pool.feeGrowthGlobal0X128();
-        uint256 feeGrowthGlobal1X128 = pool.feeGrowthGlobal1X128();
-        (, , uint256 feeGrowthOutside0X128Lower, uint256 feeGrowthOutside1X128Lower, , , , ) = pool.ticks(position.tickLower);
-        (, , uint256 feeGrowthOutside0X128Upper, uint256 feeGrowthOutside1X128Upper, , , , ) = pool.ticks(position.tickUpper);
-        (
-            uint128 liquidity,
-            uint256 feeGrowthInside0Last,
-            uint256 feeGrowthInside1Last,
-            uint128 tokensOwed0,
-            uint128 tokensOwed1
-        ) = pool.positions(positionKey);
-
-        (amount0, amount1) = LiquidityAmounts.getAmountsForLiquidity(
-            sqrtPriceX96,
-            TickMath.getSqrtRatioAtTick(position.tickLower),
-            TickMath.getSqrtRatioAtTick(position.tickUpper),
-            liquidity
-        );
-        
-        fee0 = tokensOwed0 + _potisionSwapFee(
-            tick,
-            position.tickLower,
-            position.tickUpper,
-            liquidity,
-            feeGrowthGlobal0X128,
-            feeGrowthInside0Last,
-            feeGrowthOutside0X128Lower,
-            feeGrowthOutside0X128Upper
-        );
-
-        fee1 = tokensOwed1 + _potisionSwapFee(
-            tick,
-            position.tickLower,
-            position.tickUpper,
-            liquidity,
-            feeGrowthGlobal1X128,
-            feeGrowthInside1Last,
-            feeGrowthOutside1X128Lower,
-            feeGrowthOutside1X128Upper
-        );
+        return VaultUtils.positionInfo(address(this), pool, positions[_index]);
     }
-
-    function _potisionSwapFee(
-        int24 _tick,
-        int24 _tickLower,
-        int24 _tickUpper,
-        uint128 _liquidity,
-        uint256 _feeGrowthGlobalX128,
-        uint256 _feeGrowthInsideLastX128,
-        uint256 _feeGrowthOutsideX128Lower,
-        uint256 _feeGrowthOutsideX128Upper
-    ) internal pure returns (uint256 swapFee) {
-        unchecked {
-            uint256 feeGrowthInsideX128;
-            uint256 feeGrowthBelowX128;
-            uint256 feeGrowthAboveX128;
-            uint256 fixedPointQ128 = 0x100000000000000000000000000000000;
-
-            feeGrowthBelowX128 = _tick >= _tickLower?
-                _feeGrowthOutsideX128Lower:
-                _feeGrowthGlobalX128 - _feeGrowthOutsideX128Lower;
-            
-            feeGrowthAboveX128 = _tick < _tickUpper?
-                _feeGrowthOutsideX128Upper:
-                _feeGrowthGlobalX128 - _feeGrowthOutsideX128Upper;
-
-            feeGrowthInsideX128 = _feeGrowthGlobalX128 - feeGrowthBelowX128 - feeGrowthAboveX128;
-
-            swapFee = FullMath.mulDiv(
-                feeGrowthInsideX128 - _feeGrowthInsideLastX128,
-                _liquidity,
-                fixedPointQ128
-            );
-        }
-    } 
 
     /// @inheritdoc ITeaVaultV3Pair
     function allPositionInfo() external override view returns (uint256 amount0, uint256 amount1, uint256 fee0, uint256 fee1) {
@@ -580,7 +498,7 @@ contract TeaVaultV3Pair is
         uint256 _fee1;
 
         for (uint256 i; i < positions.length; i++) {
-            (_amount0, _amount1, _fee0, _fee1) = _positionInfo(i);
+            (_amount0, _amount1, _fee0, _fee1) = VaultUtils.positionInfo(address(this), pool, positions[i]);
             amount0 += _amount0;
             amount1 += _amount1;
             fee0 += _fee0;
@@ -603,15 +521,13 @@ contract TeaVaultV3Pair is
     /// @inheritdoc ITeaVaultV3Pair
     function estimatedValueInToken0() external override view returns (uint256 value0) {
         (uint256 _amount0, uint256 _amount1) = _vaultAllUnderlyingAssets();
-
-        // TODO: implement main logic
+        value0 = VaultUtils.estimatedValueInToken0(pool, _amount0, _amount1);
     }
 
     /// @inheritdoc ITeaVaultV3Pair
     function estimatedValueInToken1() external override view returns (uint256 value1) {
         (uint256 _amount0, uint256 _amount1) = _vaultAllUnderlyingAssets();
-
-        // TODO: implement main logic
+        value1 = VaultUtils.estimatedValueInToken1(pool, _amount0, _amount1);
     }
 
     // modifiers
