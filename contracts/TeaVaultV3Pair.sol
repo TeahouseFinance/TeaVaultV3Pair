@@ -14,10 +14,9 @@ import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 import "@uniswap/v3-core/contracts/libraries/FullMath.sol";
 import "@uniswap/v3-periphery/contracts/libraries/PoolAddress.sol";
-import "@uniswap/v3-periphery/contracts/libraries/LiquidityAmounts.sol";
 
 import "./interface/ITeaVaultV3Pair.sol";
-import {VaultUtils} from "./VaultUtils.sol";
+import "./VaultUtils.sol";
 
 contract TeaVaultV3Pair is
     Initializable,
