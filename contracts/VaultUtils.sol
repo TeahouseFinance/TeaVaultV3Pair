@@ -15,7 +15,7 @@ library VaultUtils {
         address vault,
         IUniswapV3Pool pool,
         ITeaVaultV3Pair.Position storage position
-    ) internal view returns (uint256 amount0, uint256 amount1, uint256 fee0, uint256 fee1) {
+    ) external view returns (uint256 amount0, uint256 amount1, uint256 fee0, uint256 fee1) {
         bytes32 positionKey = keccak256(abi.encodePacked(vault, position.tickLower, position.tickUpper));
         (uint160 sqrtPriceX96, int24 tick, , , , , ) = pool.slot0();
         uint256 feeGrowthGlobal0X128 = pool.feeGrowthGlobal0X128();
@@ -69,7 +69,7 @@ library VaultUtils {
         uint256 _feeGrowthInsideLastX128,
         uint256 _feeGrowthOutsideX128Lower,
         uint256 _feeGrowthOutsideX128Upper
-    ) internal pure returns (uint256 swapFee) {
+    ) public pure returns (uint256 swapFee) {
         unchecked {
             uint256 feeGrowthInsideX128;
             uint256 feeGrowthBelowX128;
