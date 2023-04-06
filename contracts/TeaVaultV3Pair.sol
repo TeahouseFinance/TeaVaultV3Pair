@@ -53,6 +53,7 @@ contract TeaVaultV3Pair is
         address _token0,
         address _token1,
         uint24 _feeTier,
+        uint8 _decimalOffset,
         address _owner
     ) public initializer {
         __UUPSUpgradeable_init();
@@ -60,9 +61,8 @@ contract TeaVaultV3Pair is
         __ReentrancyGuard_init();
         __ERC20_init(_name, _symbol);
         
-        uint8 DECIMALS_OFFSET = 12;
         SECONDS_IN_A_YEAR = 365 * 24 * 60 * 60;
-        DECIMALS_MULTIPLIER = 10 ** DECIMALS_OFFSET;
+        DECIMALS_MULTIPLIER = 10 ** _decimalOffset;
         MAX_POSITION_LENGTH = 5;
 
         IUniswapV3Factory factory = IUniswapV3Factory(_factory);
@@ -70,7 +70,7 @@ contract TeaVaultV3Pair is
         pool = IUniswapV3Pool(PoolAddress.computeAddress(address(factory), poolKey));
         token0 = ERC20Upgradeable(poolKey.token0);
         token1 = ERC20Upgradeable(poolKey.token1);
-        DECIMALS = DECIMALS_OFFSET + token0.decimals();
+        DECIMALS = _decimalOffset + token0.decimals();
 
         callbackStatus = 1;
         transferOwnership(_owner);
@@ -82,6 +82,14 @@ contract TeaVaultV3Pair is
 
     function decimals() public view override returns (uint8) {
         return DECIMALS;
+    }
+
+    function assetToken0() external view returns (address) {
+        return address(token0);
+    }
+
+    function assetToken1() external view returns (address) {
+        return address(token1);
     }
 
     /// @inheritdoc ITeaVaultV3Pair

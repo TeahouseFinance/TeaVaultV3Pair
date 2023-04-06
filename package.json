@@ -24,6 +24,7 @@
     "solidity-coverage": "^0.7.22"
   },
   "dependencies": {
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.8",
     "@openzeppelin/contracts-upgradeable": "4.8.2",
     "@uniswap/v3-core": "github:Uniswap/v3-core#0.8",
     "@uniswap/v3-periphery": "github:Uniswap/v3-periphery#0.8"

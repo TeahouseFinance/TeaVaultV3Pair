@@ -48,6 +48,9 @@ interface ITeaVaultV3Pair {
         uint128 liquidity;
     }
 
+    function assetToken0() external returns (address);
+    function assetToken1() external returns (address);
+
     /// @notice Set fee structure and vault addresses
     /// @notice Only available to admins
     /// @param _feeConfig Fee structure settings
