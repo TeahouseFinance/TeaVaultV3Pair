@@ -32,6 +32,7 @@ contract TeaVaultV3Pair is
 
     uint256 public SECONDS_IN_A_YEAR;
     uint256 public DECIMALS_MULTIPLIER;
+    uint256 public FEE_MULTIPLIER;
     uint8 internal DECIMALS;
     uint8 internal MAX_POSITION_LENGTH;
 
@@ -63,6 +64,7 @@ contract TeaVaultV3Pair is
         
         SECONDS_IN_A_YEAR = 365 * 24 * 60 * 60;
         DECIMALS_MULTIPLIER = 10 ** _decimalOffset;
+        FEE_MULTIPLIER = 1000000;
         MAX_POSITION_LENGTH = 5;
 
         IUniswapV3Factory factory = IUniswapV3Factory(_factory);
@@ -94,9 +96,9 @@ contract TeaVaultV3Pair is
 
     /// @inheritdoc ITeaVaultV3Pair
     function setFeeConfig(FeeConfig calldata _feeConfig) external override onlyOwner {
-        if (_feeConfig.entryFee + _feeConfig.exitFee > 1000000) revert InvalidFeePercentage();
-        if (_feeConfig.performanceFee > 1000000) revert InvalidFeePercentage();
-        if (_feeConfig.managementFee > 1000000) revert InvalidFeePercentage();
+        if (_feeConfig.entryFee + _feeConfig.exitFee > FEE_MULTIPLIER) revert InvalidFeePercentage();
+        if (_feeConfig.performanceFee > FEE_MULTIPLIER) revert InvalidFeePercentage();
+        if (_feeConfig.managementFee > FEE_MULTIPLIER) revert InvalidFeePercentage();
 
         feeConfig = _feeConfig;
 
@@ -121,8 +123,8 @@ contract TeaVaultV3Pair is
             unchecked {
                 uint256 feeTimesTimediff = feeConfig.managementFee * timeDiff;
                 uint256 denominator = (
-                    1000000 * SECONDS_IN_A_YEAR > feeTimesTimediff?
-                        1000000 * SECONDS_IN_A_YEAR - feeTimesTimediff:
+                    FEE_MULTIPLIER * SECONDS_IN_A_YEAR > feeTimesTimediff?
+                        FEE_MULTIPLIER * SECONDS_IN_A_YEAR - feeTimesTimediff:
                         1
                 );
                 collectedShares = totalSupply().mulDivRoundingUp(feeTimesTimediff, denominator);
@@ -180,8 +182,21 @@ contract TeaVaultV3Pair is
 
         // make sure a user can't make a zero amount deposit
         if (depositedAmount0 == 0 && depositedAmount1 == 0) revert InvalidShareAmount();
+
+        // add entry fee
+        uint256 entryFeeAmount0 = depositedAmount0.mulDivRoundingUp(feeConfig.entryFee, FEE_MULTIPLIER);
+        uint256 entryFeeAmount1 = depositedAmount1.mulDivRoundingUp(feeConfig.entryFee, FEE_MULTIPLIER);
+
+        token0.safeTransferFrom(msg.sender, feeConfig.vault, entryFeeAmount0);
+        token1.safeTransferFrom(msg.sender, feeConfig.vault, entryFeeAmount1);
+
+        depositedAmount0 += entryFeeAmount0;
+        depositedAmount1 += entryFeeAmount1;
+
         if (depositedAmount0 > _amount0Max || depositedAmount1 > _amount1Max) revert InvalidPriceSlippage();
         _mint(msg.sender, _shares);
+
+        emit DepositShares(msg.sender, _shares, depositedAmount0, depositedAmount1);
     }
 
     /// @inheritdoc ITeaVaultV3Pair
@@ -191,10 +206,11 @@ contract TeaVaultV3Pair is
         uint256 _amount1Min
     ) external override nonReentrant returns (uint256 withdrawnAmount0, uint256 withdrawnAmount1) {
         if (_shares == 0) revert InvalidShareAmount();
+        uint256 totalShares = totalSupply();
+        
         _burn(msg.sender, _shares);
         _collectManagementFee();
 
-        uint256 totalShares = totalSupply();
         uint256 positionLength = positions.length;
         uint256 amount0;
         uint256 amount1;
@@ -213,11 +229,22 @@ contract TeaVaultV3Pair is
 
         withdrawnAmount0 += token0.balanceOf(address(this)).mulDiv(_shares, totalShares);
         withdrawnAmount1 += token1.balanceOf(address(this)).mulDiv(_shares, totalShares);
-        if (withdrawnAmount0 < _amount0Min || withdrawnAmount1 < _amount1Min) revert InvalidPriceSlippage();
+
+        // collect exit fee
+        uint256 exitFeeAmount0 = withdrawnAmount0.mulDivRoundingUp(feeConfig.exitFee, FEE_MULTIPLIER);
+        uint256 exitFeeAmount1 = withdrawnAmount1.mulDivRoundingUp(feeConfig.exitFee, FEE_MULTIPLIER);
+
+        token0.safeTransfer(feeConfig.vault, exitFeeAmount0);
+        token1.safeTransfer(feeConfig.vault, exitFeeAmount1);
+
+        withdrawnAmount0 -= exitFeeAmount0;
+        withdrawnAmount1 -= exitFeeAmount1;
 
         token0.safeTransfer(msg.sender, withdrawnAmount0);
         token1.safeTransfer(msg.sender, withdrawnAmount1);
-        
+
+        if (withdrawnAmount0 < _amount0Min || withdrawnAmount1 < _amount1Min) revert InvalidPriceSlippage();
+
         emit withdrawShares(msg.sender, _shares, withdrawnAmount0, withdrawnAmount1);
     }
 
@@ -377,6 +404,8 @@ contract TeaVaultV3Pair is
 
     function _collect(int24 _tickLower, int24 _tickUpper) internal returns (uint128 amount0, uint128 amount1) {
         (amount0, amount1) = pool.collect(address(this), _tickLower, _tickUpper, type(uint128).max, type(uint128).max);
+
+        // TODO: collect performance fee
 
         emit Collect(address(pool), _tickLower, _tickUpper, amount0, amount1);
     }

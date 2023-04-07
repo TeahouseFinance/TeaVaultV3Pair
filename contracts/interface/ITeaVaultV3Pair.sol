@@ -15,13 +15,14 @@ error TransactionExpired();
 
 interface ITeaVaultV3Pair {
     event TeaVaultV3PairCreated(address indexed teaVaultAddress);
-    event FeeConfigChanged(address indexed caller, uint256 indexed timestamp, FeeConfig feeConfig);
+    event FeeConfigChanged(address indexed caller, uint256 timestamp, FeeConfig feeConfig);
     event ManagerChanged(address indexed sender, address indexed newManager);
-    event ManagementFeeCollected(uint256 indexed shares);
-    event withdrawShares(address indexed shareOwner, uint256 indexed shares, uint256 amount0, uint256 amount1);
-    event AddLiquidity(address pool, int24 tickLower, int24 tickUpper, uint128 liquidity, uint256 amount0, uint256 amount1);
-    event RemoveLiquidity(address pool, int24 tickLower, int24 tickUpper, uint128 liquidity, uint256 amount0, uint256 amount1);
-    event Collect(address pool, int24 tickLower, int24 tickUpper, uint256 amount0, uint256 amount1);
+    event ManagementFeeCollected(uint256 shares);
+    event DepositShares(address indexed shareOwner, uint256 shares, uint256 amount0, uint256 amount1);
+    event withdrawShares(address indexed shareOwner, uint256 shares, uint256 amount0, uint256 amount1);
+    event AddLiquidity(address indexed pool, int24 tickLower, int24 tickUpper, uint128 liquidity, uint256 amount0, uint256 amount1);
+    event RemoveLiquidity(address indexed pool, int24 tickLower, int24 tickUpper, uint128 liquidity, uint256 amount0, uint256 amount1);
+    event Collect(address indexed pool, int24 tickLower, int24 tickUpper, uint256 amount0, uint256 amount1);
     event Swap(bool indexed zeroForOne, bool indexed exactInput, uint256 amountIn, uint256 amountOut);
 
     /// @notice Fee config structure
