@@ -191,7 +191,7 @@ describe("TeaVaultV3Pair", function () {
                 managementFee: 10000,
             }
 
-            await vault.setFeeConfig(feeConfig);            
+            await vault.setFeeConfig(feeConfig);
 
             // deposit
             await token0.connect(user).approve(vault.address, "10000" + "0".repeat(await token0.decimals()));
@@ -218,6 +218,41 @@ describe("TeaVaultV3Pair", function () {
             expectedAmount0 = expectedAmount0.sub(exitFeeAmount0);
             expect(token0After.sub(token0Before)).to.equal(expectedAmount0); // user received expectedAmount0 of token0
             expect(await token0.balanceOf(owner.address)).to.equal(entryFeeAmount0.add(exitFeeAmount0)); // vault received exitFeeAmount0 of token0
+        });
+
+        it("Should not be able to deposit and withdraw incorrect amounts", async function() {
+            const { user, vault, token0 } = await helpers.loadFixture(deployTeaVaultV3Pair);
+
+            // deposit without enough allowance
+            await token0.connect(user).approve(vault.address, "1000" + "0".repeat(await token0.decimals()));
+            const shares = "10000" + "0".repeat(await vault.decimals());
+            await expect(vault.connect(user).deposit(shares, UINT256_MAX, UINT256_MAX)).to.be.revertedWith("");
+
+            const smallerShares = "100" + "0".repeat(await vault.decimals());
+            await vault.connect(user).deposit(smallerShares, UINT256_MAX, UINT256_MAX);
+
+            // withdraw more than owned shares
+            await expect(vault.connect(user).withdraw(shares, 0, 0)).to.be.revertedWith("");
+        });
+
+        it("Should revert with slippage checks when depositing", async function() {
+            const { user, vault, token0 } = await helpers.loadFixture(deployTeaVaultV3Pair);
+
+            // deposit with slippage check
+            await token0.connect(user).approve(vault.address, "10000" + "0".repeat(await token0.decimals()));
+            const shares = "10000" + "0".repeat(await vault.decimals());
+            await expect(vault.connect(user).deposit(shares, "100", "100")).to.be.revertedWith("");
+        });
+
+        it("Should revert with slippage checks when withdrawing", async function() {
+            const { user, vault, token0 } = await helpers.loadFixture(deployTeaVaultV3Pair);
+
+            await token0.connect(user).approve(vault.address, "1000" + "0".repeat(await token0.decimals()));
+            const shares = "100" + "0".repeat(await vault.decimals());
+            await vault.connect(user).deposit(shares, UINT256_MAX, UINT256_MAX);
+
+            // withdraw with slippage check
+            await expect(vault.connect(user).withdraw(shares, "100", "100")).to.be.revertedWith("");
         });
     })
 })

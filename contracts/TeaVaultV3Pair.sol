@@ -187,13 +187,18 @@ contract TeaVaultV3Pair is
         uint256 entryFeeAmount0 = depositedAmount0.mulDivRoundingUp(feeConfig.entryFee, FEE_MULTIPLIER);
         uint256 entryFeeAmount1 = depositedAmount1.mulDivRoundingUp(feeConfig.entryFee, FEE_MULTIPLIER);
 
-        token0.safeTransferFrom(msg.sender, feeConfig.vault, entryFeeAmount0);
-        token1.safeTransferFrom(msg.sender, feeConfig.vault, entryFeeAmount1);
+        if (entryFeeAmount0 > 0) {
+            token0.safeTransferFrom(msg.sender, feeConfig.vault, entryFeeAmount0);
+        }
+        
+        if (entryFeeAmount1 > 0) {
+            token1.safeTransferFrom(msg.sender, feeConfig.vault, entryFeeAmount1);
+        }
 
         depositedAmount0 += entryFeeAmount0;
         depositedAmount1 += entryFeeAmount1;
 
-        if (depositedAmount0 > _amount0Max || depositedAmount1 > _amount1Max) revert InvalidPriceSlippage();
+        if (depositedAmount0 > _amount0Max || depositedAmount1 > _amount1Max) revert InvalidPriceSlippage(depositedAmount0, depositedAmount1);
         _mint(msg.sender, _shares);
 
         emit DepositShares(msg.sender, _shares, depositedAmount0, depositedAmount1);
@@ -234,8 +239,13 @@ contract TeaVaultV3Pair is
         uint256 exitFeeAmount0 = withdrawnAmount0.mulDivRoundingUp(feeConfig.exitFee, FEE_MULTIPLIER);
         uint256 exitFeeAmount1 = withdrawnAmount1.mulDivRoundingUp(feeConfig.exitFee, FEE_MULTIPLIER);
 
-        token0.safeTransfer(feeConfig.vault, exitFeeAmount0);
-        token1.safeTransfer(feeConfig.vault, exitFeeAmount1);
+        if (exitFeeAmount0 > 0) {
+            token0.safeTransfer(feeConfig.vault, exitFeeAmount0);
+        }
+
+        if (exitFeeAmount1 > 0) {
+            token1.safeTransfer(feeConfig.vault, exitFeeAmount1);
+        }
 
         withdrawnAmount0 -= exitFeeAmount0;
         withdrawnAmount1 -= exitFeeAmount1;
@@ -243,7 +253,7 @@ contract TeaVaultV3Pair is
         token0.safeTransfer(msg.sender, withdrawnAmount0);
         token1.safeTransfer(msg.sender, withdrawnAmount1);
 
-        if (withdrawnAmount0 < _amount0Min || withdrawnAmount1 < _amount1Min) revert InvalidPriceSlippage();
+        if (withdrawnAmount0 < _amount0Min || withdrawnAmount1 < _amount1Min) revert InvalidPriceSlippage(withdrawnAmount0, withdrawnAmount1);
 
         emit withdrawShares(msg.sender, _shares, withdrawnAmount0, withdrawnAmount1);
     }
@@ -296,7 +306,7 @@ contract TeaVaultV3Pair is
             Position storage position = positions[i];
             if (position.tickLower == _tickLower && position.tickUpper == _tickUpper) {
                 (amount0, amount1) = _removeLiquidity(_tickLower, _tickUpper, _liquidity);
-                if (amount0 < _amount0Min || amount1 < _amount1Min) revert InvalidPriceSlippage();
+                if (amount0 < _amount0Min || amount1 < _amount1Min) revert InvalidPriceSlippage(amount0, amount1);
                 _collect(_tickLower, _tickUpper);
 
                 if (position.liquidity == _liquidity) {
@@ -357,7 +367,7 @@ contract TeaVaultV3Pair is
         uint256 _amount1Min
     ) internal returns (uint256 amount0, uint256 amount1) {
         (amount0, amount1) = _addLiquidity(_tickLower, _tickUpper, _liquidity, "");
-        if (amount0 < _amount0Min || amount1 < _amount1Min) revert InvalidPriceSlippage();
+        if (amount0 < _amount0Min || amount1 < _amount1Min) revert InvalidPriceSlippage(amount0, amount1);
     }
 
     function _addLiquidity(
@@ -409,8 +419,13 @@ contract TeaVaultV3Pair is
         uint256 performanceFeeAmount0 = uint256(amount0).mulDivRoundingUp(feeConfig.performanceFee, 1000000);
         uint256 performanceFeeAmount1 = uint256(amount1).mulDivRoundingUp(feeConfig.performanceFee, 1000000);
 
-        token0.safeTransfer(feeConfig.vault, performanceFeeAmount0);
-        token1.safeTransfer(feeConfig.vault, performanceFeeAmount1);
+        if (performanceFeeAmount0 > 0) {
+            token0.safeTransfer(feeConfig.vault, performanceFeeAmount0);
+        }
+
+        if (performanceFeeAmount1 > 0) {
+            token1.safeTransfer(feeConfig.vault, performanceFeeAmount1);
+        }
 
         emit Collect(address(pool), _tickLower, _tickUpper, amount0, amount1);
     }
@@ -436,7 +451,7 @@ contract TeaVaultV3Pair is
         callbackStatus = 1;
 
         amountOut = uint256(-(_zeroForOne ? amount1 : amount0));
-        if(amountOut < _amountOutMin) revert InvalidPriceSlippage();
+        if(amountOut < _amountOutMin) revert InvalidPriceSlippage(amountOut, 0);
 
         emit Swap(_zeroForOne, true, _amountIn, amountOut);
     }
@@ -469,8 +484,8 @@ contract TeaVaultV3Pair is
 
         // it's technically possible to not receive the full output amount,
         // so if no price limit has been specified, require this possibility away
-        if (_maxPriceInSqrtPriceX96 == 0 && amountOutReceived != _amountOut) revert InvalidPriceSlippage();
-        if (amountIn > _amountInMax) revert InvalidPriceSlippage();
+        if (_maxPriceInSqrtPriceX96 == 0 && amountOutReceived != _amountOut) revert InvalidPriceSlippage(amountOutReceived, 0);
+        if (amountIn > _amountInMax) revert InvalidPriceSlippage(amountIn, 0);
 
         emit Swap(_zeroForOne, false, amountIn, _amountOut);
     }
@@ -528,11 +543,7 @@ contract TeaVaultV3Pair is
     }
 
     /// @inheritdoc ITeaVaultV3Pair
-    function allPositionInfo() external override view returns (uint256 amount0, uint256 amount1, uint256 fee0, uint256 fee1) {
-        return _allPositionInfo();
-    }
-
-    function _allPositionInfo() internal view returns (uint256 amount0, uint256 amount1, uint256 fee0, uint256 fee1) {
+    function allPositionInfo() public view returns (uint256 amount0, uint256 amount1, uint256 fee0, uint256 fee1) {
         uint256 _amount0;
         uint256 _amount1;
         uint256 _fee0;
@@ -548,12 +559,8 @@ contract TeaVaultV3Pair is
     }
 
     /// @inheritdoc ITeaVaultV3Pair
-    function vaultAllUnderlyingAssets() external override view returns (uint256 amount0, uint256 amount1) {
-        return _vaultAllUnderlyingAssets();
-    }
-
-    function _vaultAllUnderlyingAssets() internal view returns (uint256 amount0, uint256 amount1) {
-        (uint256 _amount0, uint256 _amount1, uint256 _fee0, uint256 _fee1) = _allPositionInfo();
+    function vaultAllUnderlyingAssets() public override view returns (uint256 amount0, uint256 amount1) {        
+        (uint256 _amount0, uint256 _amount1, uint256 _fee0, uint256 _fee1) = allPositionInfo();
         amount0 = _amount0 + _fee0;
         amount1 = _amount1 + _fee1;
     }
@@ -561,13 +568,13 @@ contract TeaVaultV3Pair is
 
     /// @inheritdoc ITeaVaultV3Pair
     function estimatedValueInToken0() external override view returns (uint256 value0) {
-        (uint256 _amount0, uint256 _amount1) = _vaultAllUnderlyingAssets();
+        (uint256 _amount0, uint256 _amount1) = vaultAllUnderlyingAssets();
         value0 = VaultUtils.estimatedValueInToken0(pool, _amount0, _amount1);
     }
 
     /// @inheritdoc ITeaVaultV3Pair
     function estimatedValueInToken1() external override view returns (uint256 value1) {
-        (uint256 _amount0, uint256 _amount1) = _vaultAllUnderlyingAssets();
+        (uint256 _amount0, uint256 _amount1) = vaultAllUnderlyingAssets();
         value1 = VaultUtils.estimatedValueInToken1(pool, _amount0, _amount1);
     }
 

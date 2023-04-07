@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 error InvalidFeePercentage();
 error InvalidShareAmount();
 error PositionLengthExceedsLimit();
-error InvalidPriceSlippage();
+error InvalidPriceSlippage(uint256 amount0, uint256 amount1);
 error PositionNotExist();
 error ZeroLiquidity();
 error CallerIsNotManager();
