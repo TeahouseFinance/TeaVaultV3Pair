@@ -207,7 +207,7 @@ contract TeaVaultV3Pair is
     ) external override nonReentrant returns (uint256 withdrawnAmount0, uint256 withdrawnAmount1) {
         if (_shares == 0) revert InvalidShareAmount();
         uint256 totalShares = totalSupply();
-        
+
         _burn(msg.sender, _shares);
         _collectManagementFee();
 
@@ -405,7 +405,12 @@ contract TeaVaultV3Pair is
     function _collect(int24 _tickLower, int24 _tickUpper) internal returns (uint128 amount0, uint128 amount1) {
         (amount0, amount1) = pool.collect(address(this), _tickLower, _tickUpper, type(uint128).max, type(uint128).max);
 
-        // TODO: collect performance fee
+        // collect performance fee
+        uint256 performanceFeeAmount0 = uint256(amount0).mulDivRoundingUp(feeConfig.performanceFee, 1000000);
+        uint256 performanceFeeAmount1 = uint256(amount1).mulDivRoundingUp(feeConfig.performanceFee, 1000000);
+
+        token0.safeTransfer(feeConfig.vault, performanceFeeAmount0);
+        token1.safeTransfer(feeConfig.vault, performanceFeeAmount1);
 
         emit Collect(address(pool), _tickLower, _tickUpper, amount0, amount1);
     }
