@@ -32,6 +32,7 @@ const testToken0Whale = loadEnvVar(process.env.UNISWAP_TEST_TOKEN0_WHALE, "No UN
 const testToken1Whale = loadEnvVar(process.env.UNISWAP_TEST_TOKEN1_WHALE, "No UNISWAP_TEST_TOKEN1_WHALE");
 
 const UINT256_MAX = '0x' + 'f'.repeat(64);
+const UINT64_MAX = '0x' + 'f'.repeat(16);
 
 
 describe("TeaVaultV3Pair", function () {
@@ -257,8 +258,8 @@ describe("TeaVaultV3Pair", function () {
             await expect(vault.connect(user).withdraw(shares, "100", "100")).to.be.revertedWith("");
         });
 
-        it("Should be able to add positions after deposit", async function() {
-            const { owner, manager, user, vault, token0 } = await helpers.loadFixture(deployTeaVaultV3Pair);
+        it("Should be able to add and remove positions after deposit", async function() {
+            const { owner, manager, user, vault, token0, token1 } = await helpers.loadFixture(deployTeaVaultV3Pair);
 
             // set fees
             const feeConfig = {
@@ -276,6 +277,7 @@ describe("TeaVaultV3Pair", function () {
 
             // deposit
             await token0.connect(user).approve(vault.address, "10000" + "0".repeat(await token0.decimals()));
+            await token1.connect(user).approve(vault.address, "10000" + "0".repeat(await token1.decimals()));
             const shares = "100" + "0".repeat(await vault.decimals());
             await vault.connect(user).deposit(shares, UINT256_MAX, UINT256_MAX);
 
@@ -286,20 +288,64 @@ describe("TeaVaultV3Pair", function () {
             const slot0 = await pool.slot0();
             const tickSpacing = await pool.tickSpacing();
 
-            const tickLower = Math.floor((slot0.tick - tickSpacing * 10) / tickSpacing) * tickSpacing;
-            const tickUpper = Math.ceil((slot0.tick + tickSpacing * 10) / tickSpacing) * tickSpacing;
-            // console.log(tickLower, tickUpper, tickSpacing);
-            // const r = await pool.callStatic.mint(manager.address, tickLower, tickUpper, 100, "0x");
-            // console.log(r);
-            // const result = await vault.connect(manager).callStatic.addLiquidity(
-            //     tickLower,
-            //     tickUpper,
-            //     100,
-            //     0,
-            //     0,
-            //     10000000000
-            // );
-            // console.log(result);
+            // swap
+            await vault.connect(manager).swapInputSingle(
+                true,
+                "50" + "0".repeat(await token0.decimals()),
+                0,
+                0,
+                UINT64_MAX
+            );
+
+            let amount0 = await token0.balanceOf(vault.address);
+            let amount1 = await token1.balanceOf(vault.address);
+
+            // add positions
+            const tick0 = Math.floor((slot0.tick - tickSpacing * 30) / tickSpacing) * tickSpacing;
+            const tick1 = Math.ceil((slot0.tick - tickSpacing * 10) / tickSpacing) * tickSpacing;
+            const tick2 = Math.ceil((slot0.tick + tickSpacing * 10) / tickSpacing) * tickSpacing;
+            const tick3 = Math.ceil((slot0.tick + tickSpacing * 30) / tickSpacing) * tickSpacing;
+
+            // add "center" position
+            const liquidity1 = await vault.getLiquidityForAmounts(tick1, tick2, amount0.div(3), amount1.div(3));
+            await vault.connect(manager).addLiquidity(tick1, tick2, liquidity1, 0, 0, UINT64_MAX);
+
+            // add "lower" position
+            amount1 = await token1.balanceOf(vault.address);
+            const liquidity0 = await vault.getLiquidityForAmounts(tick0, tick1, 0, amount1);
+            await vault.connect(manager).addLiquidity(tick0, tick1, liquidity0, 0, 0, UINT64_MAX);
+
+            // add "upper" position
+            amount0 = await token0.balanceOf(vault.address);
+            const liquidity2 = await vault.getLiquidityForAmounts(tick2, tick3, amount0, 0);
+            await vault.connect(manager).addLiquidity(tick2, tick3, liquidity2, 0, 0, UINT64_MAX);
+
+            // add more liquidity
+            const shares2 = "1000" + "0".repeat(await vault.decimals());
+            await vault.connect(user).deposit(shares2, UINT256_MAX, UINT256_MAX);
+
+            // reduce some position
+            const position1 = await vault.positions(1);
+            await vault.connect(manager).removeLiquidity(position1.tickLower, position1.tickUpper, position1.liquidity, 0, 0, UINT64_MAX);
+
+            // withdraw
+            const amount0Before = await token0.balanceOf(user.address);
+            const amount1Before = await token1.balanceOf(user.address);
+            const totalShares = await vault.balanceOf(user.address);
+            await vault.connect(user).withdraw(totalShares, 0, 0);
+            const amount0After = await token0.balanceOf(user.address);
+            const amount1After = await token1.balanceOf(user.address);
+
+            expect(await vault.balanceOf(user.address)).to.equal(0);
+            const amount0Diff = amount0After.sub(amount0Before);
+            const amount1Diff = amount1After.sub(amount1Before);
+
+            const price = slot0.sqrtPriceX96.mul(slot0.sqrtPriceX96);
+            const totalIn0 = amount1Diff.mul(ethers.BigNumber.from(2).pow(192)).div(price).add(amount0Diff);
+
+            // expect withdrawn tokens to be > 95% of invested token0
+            const investedToken0 = ethers.BigNumber.from("1100" + "0".repeat(await token0.decimals()));
+            expect(totalIn0.toNumber()).to.greaterThan(investedToken0.mul(95).div(100).toNumber());
         });
     })
 })

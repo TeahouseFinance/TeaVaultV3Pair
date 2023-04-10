@@ -18,6 +18,8 @@ import "@uniswap/v3-periphery/contracts/libraries/PoolAddress.sol";
 import "./interface/ITeaVaultV3Pair.sol";
 import "./VaultUtils.sol";
 
+//import "hardhat/console.sol";
+
 contract TeaVaultV3Pair is
     Initializable,
     UUPSUpgradeable,
@@ -68,10 +70,9 @@ contract TeaVaultV3Pair is
         MAX_POSITION_LENGTH = 5;
 
         IUniswapV3Factory factory = IUniswapV3Factory(_factory);
-        PoolAddress.PoolKey memory poolKey = PoolAddress.getPoolKey(_token0, _token1, _feeTier);
-        pool = IUniswapV3Pool(PoolAddress.computeAddress(address(factory), poolKey));
-        token0 = ERC20Upgradeable(poolKey.token0);
-        token1 = ERC20Upgradeable(poolKey.token1);
+        pool = IUniswapV3Pool(factory.getPool(_token0, _token1, _feeTier));
+        token0 = ERC20Upgradeable(_token0);
+        token1 = ERC20Upgradeable(_token1);
         DECIMALS = _decimalOffset + token0.decimals();
 
         callbackStatus = 1;
@@ -151,6 +152,7 @@ contract TeaVaultV3Pair is
         }
         else {
             _collectManagementFee();
+            _collectAllSwapFee();
 
             uint256 positionLength = positions.length;
             uint256 amount0;
@@ -158,10 +160,8 @@ contract TeaVaultV3Pair is
             uint128 liquidity;
             bytes memory callbackData = abi.encode(msg.sender);
 
-            for (uint256 i; i < positionLength; i++) {
+            for (uint256 i = 0; i < positionLength; i++) {
                 Position storage position = positions[i];
-                pool.burn(position.tickLower, position.tickUpper, 0);
-                _collect(position.tickLower, position.tickUpper);
 
                 liquidity = uint256(position.liquidity).mulDivRoundingUp(_shares, totalShares).toUint128();
                 (amount0, amount1) = _addLiquidity(position.tickLower, position.tickUpper, liquidity, callbackData);
@@ -228,7 +228,15 @@ contract TeaVaultV3Pair is
         uint256 amount0;
         uint256 amount1;
 
-        for (uint256 i; i < positionLength; i++) {
+        // collect all swap fees first
+        _collectAllSwapFee();
+
+        // calculate how much percentage of "cash" should be withdrawn
+        // need to be done before removing any liquidity positions
+        withdrawnAmount0 = token0.balanceOf(address(this)).mulDiv(_shares, totalShares);
+        withdrawnAmount1 = token1.balanceOf(address(this)).mulDiv(_shares, totalShares);
+
+        for (uint256 i = 0; i < positionLength; i++) {
             Position storage position = positions[i];
             int24 tickLower = position.tickLower;
             int24 tickUpper = position.tickUpper;
@@ -239,9 +247,6 @@ contract TeaVaultV3Pair is
             withdrawnAmount0 += amount0;
             withdrawnAmount1 += amount1;
         }
-
-        withdrawnAmount0 += token0.balanceOf(address(this)).mulDiv(_shares, totalShares);
-        withdrawnAmount1 += token1.balanceOf(address(this)).mulDiv(_shares, totalShares);
 
         if (withdrawnAmount0 < _amount0Min || withdrawnAmount1 < _amount1Min) revert InvalidPriceSlippage(withdrawnAmount0, withdrawnAmount1);
 
@@ -260,15 +265,14 @@ contract TeaVaultV3Pair is
         uint256 _amount1Min,
         uint64 _deadline
     ) external override checkDeadline(_deadline) onlyManager returns (uint256 amount0, uint256 amount1) {
-        uint128 liquidity;
         uint256 positionLength = positions.length;
         uint256 i;
 
-        for (; i < positionLength; i++) {
+        for (i = 0; i < positionLength; i++) {
             Position storage position = positions[i];
             if (position.tickLower == _tickLower && position.tickUpper == _tickUpper) {
                 (amount0, amount1) = _addLiquidity(_tickLower, _tickUpper, _liquidity, _amount0Min, _amount1Min);
-                position.liquidity += liquidity;
+                position.liquidity += _liquidity;
 
                 return (amount0, amount1);
             }
@@ -280,7 +284,7 @@ contract TeaVaultV3Pair is
         positions.push(Position({
             tickLower: _tickLower,
             tickUpper: _tickUpper,
-            liquidity: liquidity
+            liquidity: _liquidity
         }));
     }
 
@@ -295,7 +299,7 @@ contract TeaVaultV3Pair is
     ) external checkDeadline(_deadline) onlyManager returns (uint256 amount0, uint256 amount1) {
         uint256 positionLength = positions.length;
 
-        for (uint256 i; i < positionLength; i++) {
+        for (uint256 i = 0; i < positionLength; i++) {
             Position storage position = positions[i];
             if (position.tickLower == _tickLower && position.tickUpper == _tickUpper) {
                 (amount0, amount1) = _removeLiquidity(_tickLower, _tickUpper, _liquidity);
@@ -324,11 +328,26 @@ contract TeaVaultV3Pair is
     ) external onlyManager returns (uint128 amount0, uint128 amount1) {
         uint256 positionLength = positions.length;
 
-        for (uint256 i; i < positionLength; i++) {
+        for (uint256 i = 0; i < positionLength; i++) {
             Position storage position = positions[i];
             if (position.tickLower == _tickLower && position.tickUpper == _tickUpper) {
                 pool.burn(_tickLower, _tickUpper, 0);
-                return _collect(_tickLower, _tickUpper);
+                (amount0, amount1) =  _collect(_tickLower, _tickUpper);
+
+                // collect performance fee
+                uint256 performanceFeeAmount0 = uint256(amount0).mulDivRoundingUp(feeConfig.performanceFee, 1000000);
+                uint256 performanceFeeAmount1 = uint256(amount1).mulDivRoundingUp(feeConfig.performanceFee, 1000000);
+
+                if (performanceFeeAmount0 > 0) {
+                    token0.safeTransfer(feeConfig.vault, performanceFeeAmount0);
+                }
+
+                if (performanceFeeAmount1 > 0) {
+                    token1.safeTransfer(feeConfig.vault, performanceFeeAmount1);
+                }
+
+                emit CollectSwapFees(address(pool), amount0, amount1, performanceFeeAmount0, performanceFeeAmount1);
+                return (amount0, amount1);
             }
         }
 
@@ -337,11 +356,15 @@ contract TeaVaultV3Pair is
 
     /// @inheritdoc ITeaVaultV3Pair
     function collectAllSwapFee() external onlyManager returns (uint128 amount0, uint128 amount1) {
+        return _collectAllSwapFee();
+    }
+
+    function _collectAllSwapFee() internal returns (uint128 amount0, uint128 amount1) {
         uint256 positionLength = positions.length;
         uint128 _amount0;
         uint128 _amount1;
 
-        for (uint256 i; i < positionLength; i++) {
+        for (uint256 i = 0; i < positionLength; i++) {
             Position storage position = positions[i];
             pool.burn(position.tickLower, position.tickUpper, 0);
             (_amount0, _amount1) = _collect(position.tickLower, position.tickUpper);
@@ -350,6 +373,20 @@ contract TeaVaultV3Pair is
                 amount1 += _amount1;
             }
         }
+
+        // collect performance fee
+        uint256 performanceFeeAmount0 = uint256(amount0).mulDivRoundingUp(feeConfig.performanceFee, 1000000);
+        uint256 performanceFeeAmount1 = uint256(amount1).mulDivRoundingUp(feeConfig.performanceFee, 1000000);
+
+        if (performanceFeeAmount0 > 0) {
+            token0.safeTransfer(feeConfig.vault, performanceFeeAmount0);
+        }
+
+        if (performanceFeeAmount1 > 0) {
+            token1.safeTransfer(feeConfig.vault, performanceFeeAmount1);
+        }
+
+        emit CollectSwapFees(address(pool), amount0, amount1, performanceFeeAmount0, performanceFeeAmount1);        
     }
 
     function _addLiquidity(
@@ -359,7 +396,7 @@ contract TeaVaultV3Pair is
         uint256 _amount0Min,
         uint256 _amount1Min
     ) internal returns (uint256 amount0, uint256 amount1) {
-        (amount0, amount1) = _addLiquidity(_tickLower, _tickUpper, _liquidity, "");
+        (amount0, amount1) = _addLiquidity(_tickLower, _tickUpper, _liquidity, abi.encode(address(0)));
         if (amount0 < _amount0Min || amount1 < _amount1Min) revert InvalidPriceSlippage(amount0, amount1);
     }
 
@@ -408,19 +445,7 @@ contract TeaVaultV3Pair is
     function _collect(int24 _tickLower, int24 _tickUpper) internal returns (uint128 amount0, uint128 amount1) {
         (amount0, amount1) = pool.collect(address(this), _tickLower, _tickUpper, type(uint128).max, type(uint128).max);
 
-        // collect performance fee
-        uint256 performanceFeeAmount0 = uint256(amount0).mulDivRoundingUp(feeConfig.performanceFee, 1000000);
-        uint256 performanceFeeAmount1 = uint256(amount1).mulDivRoundingUp(feeConfig.performanceFee, 1000000);
-
-        if (performanceFeeAmount0 > 0) {
-            token0.safeTransfer(feeConfig.vault, performanceFeeAmount0);
-        }
-
-        if (performanceFeeAmount1 > 0) {
-            token1.safeTransfer(feeConfig.vault, performanceFeeAmount1);
-        }
-
-        emit Collect(address(pool), _tickLower, _tickUpper, amount0, amount1, performanceFeeAmount0, performanceFeeAmount1);
+        emit Collect(address(pool), _tickLower, _tickUpper, amount0, amount1);
     }
 
     /// @inheritdoc ITeaVaultV3Pair
@@ -517,7 +542,7 @@ contract TeaVaultV3Pair is
         int24 _tickLower,
         int24 _tickUpper
     ) external override view returns (uint256 amount0, uint256 amount1, uint256 fee0, uint256 fee1) {
-        for (uint256 i; i < positions.length; i++) {
+        for (uint256 i = 0; i < positions.length; i++) {
             Position storage position = positions[i];
             if (position.tickLower == _tickLower && position.tickUpper == _tickUpper) {
                 return VaultUtils.positionInfo(address(this), pool, positions[i]);
@@ -542,7 +567,7 @@ contract TeaVaultV3Pair is
         uint256 _fee0;
         uint256 _fee1;
 
-        for (uint256 i; i < positions.length; i++) {
+        for (uint256 i = 0; i < positions.length; i++) {
             (_amount0, _amount1, _fee0, _fee1) = VaultUtils.positionInfo(address(this), pool, positions[i]);
             amount0 += _amount0;
             amount1 += _amount1;
@@ -569,6 +594,27 @@ contract TeaVaultV3Pair is
     function estimatedValueInToken1() external override view returns (uint256 value1) {
         (uint256 _amount0, uint256 _amount1) = vaultAllUnderlyingAssets();
         value1 = VaultUtils.estimatedValueInToken1(pool, _amount0, _amount1);
+    }
+
+    function getLiquidityForAmounts(
+        int24 tickLower,
+        int24 tickUpper,
+        uint256 amount0,
+        uint256 amount1
+    ) external view returns (uint128 liquidity) {
+        return VaultUtils.getLiquidityForAmounts(pool, tickLower, tickUpper, amount0, amount1);
+    }
+
+    function getAmountsForLiquidity(
+        int24 tickLower,
+        int24 tickUpper,
+        uint128 liquidity
+    ) external view returns (uint256 amount0, uint256 amount1) {
+        return VaultUtils.getAmountsForLiquidity(pool, tickLower, tickUpper, liquidity);
+    }
+
+    function getPositionLength() external view returns (uint256) {
+        return positions.length;
     }
 
     // modifiers

@@ -11,6 +11,40 @@ import "./interface/ITeaVaultV3Pair.sol";
 
 library VaultUtils {
 
+    function getLiquidityForAmounts(
+        IUniswapV3Pool _pool,
+        int24 _tickLower,
+        int24 _tickUpper,
+        uint256 _amount0,
+        uint256 _amount1
+    ) external view returns (uint128 liquidity) {
+        (uint160 sqrtPriceX96, , , , , , ) = _pool.slot0();
+        
+        return LiquidityAmounts.getLiquidityForAmounts(
+            sqrtPriceX96,
+            TickMath.getSqrtRatioAtTick(_tickLower),
+            TickMath.getSqrtRatioAtTick(_tickUpper),
+            _amount0,
+            _amount1
+        );
+    }
+
+    function getAmountsForLiquidity(
+        IUniswapV3Pool _pool,
+        int24 _tickLower,
+        int24 _tickUpper,
+        uint128 _liquidity
+    ) external view returns (uint256 amount0, uint256 amount1) {
+        (uint160 sqrtPriceX96, , , , , , ) = _pool.slot0();
+
+        return LiquidityAmounts.getAmountsForLiquidity(
+            sqrtPriceX96,
+            TickMath.getSqrtRatioAtTick(_tickLower),
+            TickMath.getSqrtRatioAtTick(_tickUpper),
+            _liquidity
+        );
+    }
+
     function positionInfo(
         address vault,
         IUniswapV3Pool pool,
