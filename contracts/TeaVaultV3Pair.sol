@@ -117,10 +117,11 @@ contract TeaVaultV3Pair is
         return _collectManagementFee();
     }
 
+    /// @dev mint shares as management fee, based on time since last time collected
+    /// @dev must be called every time before totalSupply changed
     function _collectManagementFee() internal returns (uint256 collectedShares) {
-        if (lastCollectManagementFee != 0) {
-            uint256 timeDiff = block.timestamp - lastCollectManagementFee;
-
+        uint256 timeDiff = block.timestamp - lastCollectManagementFee;
+        if (timeDiff > 0) {
             unchecked {
                 uint256 feeTimesTimediff = feeConfig.managementFee * timeDiff;
                 uint256 denominator = (
@@ -131,10 +132,13 @@ contract TeaVaultV3Pair is
                 collectedShares = totalSupply().mulDivRoundingUp(feeTimesTimediff, denominator);
             }
 
-            _mint(feeConfig.vault, collectedShares);
-            emit ManagementFeeCollected(collectedShares);
+            if (collectedShares > 0) {
+                _mint(feeConfig.vault, collectedShares);
+                emit ManagementFeeCollected(collectedShares);
+            }
+
+            lastCollectManagementFee = block.timestamp;
         }
-        lastCollectManagementFee = block.timestamp;
     }
 
     /// @inheritdoc ITeaVaultV3Pair
@@ -145,13 +149,13 @@ contract TeaVaultV3Pair is
     ) external override nonReentrant returns (uint256 depositedAmount0, uint256 depositedAmount1) {
         if (_shares == 0) revert InvalidShareAmount();
         uint256 totalShares = totalSupply();
+        _collectManagementFee();
 
         if (totalShares == 0) {
             depositedAmount0 = _shares / DECIMALS_MULTIPLIER;
             token0.safeTransferFrom(msg.sender, address(this), depositedAmount0);
         }
         else {
-            _collectManagementFee();
             _collectAllSwapFee();
 
             uint256 positionLength = positions.length;
@@ -218,6 +222,7 @@ contract TeaVaultV3Pair is
     ) external override nonReentrant returns (uint256 withdrawnAmount0, uint256 withdrawnAmount1) {
         if (_shares == 0) revert InvalidShareAmount();
         uint256 totalShares = totalSupply();
+        _collectManagementFee();
 
         // collect exit fee for users
         // do not collect exit fee for fee recipient
@@ -233,7 +238,6 @@ contract TeaVaultV3Pair is
         }
 
         _burn(msg.sender, _shares);
-        _collectManagementFee();
 
         uint256 positionLength = positions.length;
         uint256 amount0;
@@ -632,6 +636,7 @@ contract TeaVaultV3Pair is
         value1 = VaultUtils.estimatedValueInToken1(pool, _amount0, _amount1);
     }
 
+    /// @inheritdoc ITeaVaultV3Pair
     function getLiquidityForAmounts(
         int24 tickLower,
         int24 tickUpper,
@@ -641,6 +646,7 @@ contract TeaVaultV3Pair is
         return VaultUtils.getLiquidityForAmounts(pool, tickLower, tickUpper, amount0, amount1);
     }
 
+    /// @inheritdoc ITeaVaultV3Pair
     function getAmountsForLiquidity(
         int24 tickLower,
         int24 tickUpper,
@@ -649,8 +655,9 @@ contract TeaVaultV3Pair is
         return VaultUtils.getAmountsForLiquidity(pool, tickLower, tickUpper, liquidity);
     }
 
-    function getPositionLength() external view returns (uint256) {
-        return positions.length;
+    /// @inheritdoc ITeaVaultV3Pair
+    function getAllPositions() external view returns (Position[] memory results) {
+        return positions;
     }
 
     // modifiers

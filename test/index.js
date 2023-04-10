@@ -208,6 +208,7 @@ describe("TeaVaultV3Pair", function () {
             expectedAmount0 = expectedAmount0.add(entryFeeAmount0);
             expect(token0Before.sub(token0After)).to.equal(expectedAmount0); // user spent expectedAmount0 of token0
             expect(await token0.balanceOf(owner.address)).to.equal(entryFeeAmount0); // vault received entryFeeAmount0 of token0
+            const depositTime = await vault.lastCollectManagementFee();
 
             // withdraw
             token0Before = await token0.balanceOf(user.address);
@@ -215,12 +216,19 @@ describe("TeaVaultV3Pair", function () {
             expect(await vault.balanceOf(user.address)).to.equal(0);
             token0After = await token0.balanceOf(user.address);
 
+            const withdrawTime = await vault.lastCollectManagementFee();
+            const managementFeeTimeDiff = feeConfig.managementFee * (withdrawTime - depositTime);
+            const feeMultiplier = await vault.FEE_MULTIPLIER();
+            const secondsInAYear = await vault.SECONDS_IN_A_YEAR();
+            const denominator = feeMultiplier * secondsInAYear - managementFeeTimeDiff;
+            const managementFee = ethers.BigNumber.from(shares).mul(managementFeeTimeDiff).add(denominator - 1).div(denominator);
+
             expectedAmount0 = ethers.BigNumber.from(token0Amount);
             const exitFeeAmount0 = expectedAmount0.mul(feeConfig.exitFee).div("1000000");
-            const exitFeeShares0 = ethers.BigNumber.from(shares).mul(feeConfig.exitFee).div("1000000");
+            const exitFeeShares = ethers.BigNumber.from(shares).mul(feeConfig.exitFee).div("1000000");
             expectedAmount0 = expectedAmount0.sub(exitFeeAmount0);
             expect(token0After.sub(token0Before)).to.equal(expectedAmount0); // user received expectedAmount0 of token0
-            expect(await vault.balanceOf(owner.address)).to.equal(exitFeeShares0); // vault received exitFeeAmount0 of token0
+            expect(await vault.balanceOf(owner.address)).to.equal(exitFeeShares.add(managementFee)); // vault received exitFeeShares and managementFee of share
         });
 
         it("Should not be able to deposit and withdraw incorrect amounts", async function() {
@@ -267,7 +275,7 @@ describe("TeaVaultV3Pair", function () {
                 entryFee: 1000,
                 exitFee: 2000,
                 performanceFee: 100000,
-                managementFee: 10000,
+                managementFee: 0,
             }
 
             await vault.setFeeConfig(feeConfig);

@@ -40,8 +40,11 @@ module.exports = {
         },
     },
     networks: {
-        ropsten: {
-            url: process.env.ROPSTEN_URL || "",
+        hardhat: {
+            allowUnlimitedContractSize: true,
+        },
+        sepolia: {
+            url: process.env.SEPOLIA_URL || "",
             accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
         },
     },

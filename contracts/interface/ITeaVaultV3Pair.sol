@@ -64,7 +64,7 @@ interface ITeaVaultV3Pair {
     function assignManager(address _manager) external;
 
     /// @notice Collect management fee by share token inflation
-    /// @notice Only the owner can do this
+    /// @notice Only fund manager can do this
     /// @return collectedShares Share amount collected by minting
     function collectManagementFee() external returns (uint256 collectedShares);
 
@@ -93,7 +93,7 @@ interface ITeaVaultV3Pair {
     ) external returns (uint256 withdrawnAmount0, uint256 withdrawnAmount1);
 
     /// @notice Add liquidity to a position from this vault
-    /// @notice Only the manager can do this
+    /// @notice Only fund manager can do this
     /// @param _tickLower Tick lower bound
     /// @param _tickUpper Tick upper bound
     /// @param _liquidity Liquidity to be added to the position
@@ -112,7 +112,7 @@ interface ITeaVaultV3Pair {
     ) external returns (uint256 amount0, uint256 amount1);
 
     /// @notice Remove liquidity from a position from this vault
-    /// @notice Only the manager can do this
+    /// @notice Only fund manager can do this
     /// @param _tickLower Tick lower bound
     /// @param _tickUpper Tick upper bound
     /// @param _liquidity Liquidity to be removed from the position
@@ -131,7 +131,7 @@ interface ITeaVaultV3Pair {
     ) external returns (uint256 amount0, uint256 amount1);
 
     /// @notice Collect swap fee of a position
-    /// @notice Only the manager can do this
+    /// @notice Only fund manager can do this
     /// @param _tickLower Tick lower bound
     /// @param _tickUpper Tick upper bound
     /// @return amount0 Token0 amount collected from the position
@@ -142,13 +142,13 @@ interface ITeaVaultV3Pair {
     ) external returns (uint128 amount0, uint128 amount1);
 
     /// @notice Collect swap fee of all positions
-    /// @notice Only the manager can do this
+    /// @notice Only fund manager can do this
     /// @return amount0 Token0 amount collected from the positions
     /// @return amount1 Token1 amount collected from the positions
     function collectAllSwapFee() external returns (uint128 amount0, uint128 amount1);
 
     /// @notice Swap tokens on the pool with exact input amount
-    /// @notice Only the manager can do this
+    /// @notice Only fund manager can do this
     /// @param _zeroForOne Swap direction from token0 to token1 or not
     /// @param _amountIn Amount of input token
     /// @param _amountOutMin Required minimum output token amount
@@ -165,7 +165,7 @@ interface ITeaVaultV3Pair {
 
 
     /// @notice Swap tokens on the pool with exact output amount
-    /// @notice Only the manager can do this
+    /// @notice Only fund manager can do this
     /// @param _zeroForOne Swap direction from token0 to token1 or not
     /// @param _amountOut Output token amount
     /// @param _amountInMax Required maximum input token amount
@@ -225,4 +225,33 @@ interface ITeaVaultV3Pair {
     /// @notice Get vault value in token1
     /// @return value1 Vault value in token1
     function estimatedValueInToken1() external view returns (uint256 value1);
+
+    /// @notice Calculate liquidity of a position from amount0 and amount1
+    /// @param tickLower lower tick of the position
+    /// @param tickUpper upper tick of the position
+    /// @param amount0 amount of token0
+    /// @param amount1 amount of token1
+    /// @return liquidity calculated liquidity 
+    function getLiquidityForAmounts(
+        int24 tickLower,
+        int24 tickUpper,
+        uint256 amount0,
+        uint256 amount1
+    ) external view returns (uint128 liquidity);
+
+    /// @notice Calculate amount of tokens required for liquidity of a position
+    /// @param tickLower lower tick of the position
+    /// @param tickUpper upper tick of the position
+    /// @param liquidity amount of liquidity
+    /// @return amount0 amount of token0 required
+    /// @return amount1 amount of token1 required
+    function getAmountsForLiquidity(
+        int24 tickLower,
+        int24 tickUpper,
+        uint128 liquidity
+    ) external view returns (uint256 amount0, uint256 amount1);
+
+    /// @notice Get all open positions
+    /// @return results Array of all open positions
+   function getAllPositions() external view returns (Position[] memory results);
 }
