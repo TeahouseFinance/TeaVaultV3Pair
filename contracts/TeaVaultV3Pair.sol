@@ -201,7 +201,7 @@ contract TeaVaultV3Pair is
         if (depositedAmount0 > _amount0Max || depositedAmount1 > _amount1Max) revert InvalidPriceSlippage(depositedAmount0, depositedAmount1);
         _mint(msg.sender, _shares);
 
-        emit DepositShares(msg.sender, _shares, depositedAmount0, depositedAmount1);
+        emit DepositShares(msg.sender, _shares, depositedAmount0, depositedAmount1, entryFeeAmount0, entryFeeAmount1);
     }
 
     /// @inheritdoc ITeaVaultV3Pair
@@ -212,6 +212,14 @@ contract TeaVaultV3Pair is
     ) external override nonReentrant returns (uint256 withdrawnAmount0, uint256 withdrawnAmount1) {
         if (_shares == 0) revert InvalidShareAmount();
         uint256 totalShares = totalSupply();
+
+        // calculate exit fee
+        uint256 exitFeeAmount = _shares.mulDivRoundingUp(feeConfig.exitFee, FEE_MULTIPLIER);
+        if (exitFeeAmount > 0) {
+            _transfer(msg.sender, feeConfig.vault, exitFeeAmount);
+        }
+
+        _shares -= exitFeeAmount;
 
         _burn(msg.sender, _shares);
         _collectManagementFee();
@@ -235,27 +243,12 @@ contract TeaVaultV3Pair is
         withdrawnAmount0 += token0.balanceOf(address(this)).mulDiv(_shares, totalShares);
         withdrawnAmount1 += token1.balanceOf(address(this)).mulDiv(_shares, totalShares);
 
-        // collect exit fee
-        uint256 exitFeeAmount0 = withdrawnAmount0.mulDivRoundingUp(feeConfig.exitFee, FEE_MULTIPLIER);
-        uint256 exitFeeAmount1 = withdrawnAmount1.mulDivRoundingUp(feeConfig.exitFee, FEE_MULTIPLIER);
-
-        if (exitFeeAmount0 > 0) {
-            token0.safeTransfer(feeConfig.vault, exitFeeAmount0);
-        }
-
-        if (exitFeeAmount1 > 0) {
-            token1.safeTransfer(feeConfig.vault, exitFeeAmount1);
-        }
-
-        withdrawnAmount0 -= exitFeeAmount0;
-        withdrawnAmount1 -= exitFeeAmount1;
+        if (withdrawnAmount0 < _amount0Min || withdrawnAmount1 < _amount1Min) revert InvalidPriceSlippage(withdrawnAmount0, withdrawnAmount1);
 
         token0.safeTransfer(msg.sender, withdrawnAmount0);
         token1.safeTransfer(msg.sender, withdrawnAmount1);
 
-        if (withdrawnAmount0 < _amount0Min || withdrawnAmount1 < _amount1Min) revert InvalidPriceSlippage(withdrawnAmount0, withdrawnAmount1);
-
-        emit withdrawShares(msg.sender, _shares, withdrawnAmount0, withdrawnAmount1);
+        emit withdrawShares(msg.sender, _shares, withdrawnAmount0, withdrawnAmount1, exitFeeAmount);
     }
 
     /// @inheritdoc ITeaVaultV3Pair
@@ -427,7 +420,7 @@ contract TeaVaultV3Pair is
             token1.safeTransfer(feeConfig.vault, performanceFeeAmount1);
         }
 
-        emit Collect(address(pool), _tickLower, _tickUpper, amount0, amount1);
+        emit Collect(address(pool), _tickLower, _tickUpper, amount0, amount1, performanceFeeAmount0, performanceFeeAmount1);
     }
 
     /// @inheritdoc ITeaVaultV3Pair

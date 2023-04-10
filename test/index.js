@@ -196,12 +196,13 @@ describe("TeaVaultV3Pair", function () {
             // deposit
             await token0.connect(user).approve(vault.address, "10000" + "0".repeat(await token0.decimals()));
             const shares = "100" + "0".repeat(await vault.decimals());
+            const token0Amount = "100" + "0".repeat(await token0.decimals());
             let token0Before = await token0.balanceOf(user.address);
             await vault.connect(user).deposit(shares, UINT256_MAX, UINT256_MAX);
             expect(await vault.balanceOf(user.address)).to.equal(shares);
             let token0After = await token0.balanceOf(user.address);
 
-            let expectedAmount0 = ethers.BigNumber.from("100" + "0".repeat(await token0.decimals()));
+            let expectedAmount0 = ethers.BigNumber.from(token0Amount);
             const entryFeeAmount0 = expectedAmount0.mul(feeConfig.entryFee).div("1000000");
             expectedAmount0 = expectedAmount0.add(entryFeeAmount0);
             expect(token0Before.sub(token0After)).to.equal(expectedAmount0); // user spent expectedAmount0 of token0
@@ -213,11 +214,12 @@ describe("TeaVaultV3Pair", function () {
             expect(await vault.balanceOf(user.address)).to.equal(0);
             token0After = await token0.balanceOf(user.address);
 
-            expectedAmount0 = ethers.BigNumber.from("100" + "0".repeat(await token0.decimals()));
+            expectedAmount0 = ethers.BigNumber.from(token0Amount);
             const exitFeeAmount0 = expectedAmount0.mul(feeConfig.exitFee).div("1000000");
+            const exitFeeShares0 = ethers.BigNumber.from(shares).mul(feeConfig.exitFee).div("1000000");
             expectedAmount0 = expectedAmount0.sub(exitFeeAmount0);
             expect(token0After.sub(token0Before)).to.equal(expectedAmount0); // user received expectedAmount0 of token0
-            expect(await token0.balanceOf(owner.address)).to.equal(entryFeeAmount0.add(exitFeeAmount0)); // vault received exitFeeAmount0 of token0
+            expect(await vault.balanceOf(owner.address)).to.equal(exitFeeShares0); // vault received exitFeeAmount0 of token0
         });
 
         it("Should not be able to deposit and withdraw incorrect amounts", async function() {
