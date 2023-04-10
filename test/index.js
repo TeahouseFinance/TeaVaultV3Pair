@@ -256,5 +256,50 @@ describe("TeaVaultV3Pair", function () {
             // withdraw with slippage check
             await expect(vault.connect(user).withdraw(shares, "100", "100")).to.be.revertedWith("");
         });
+
+        it("Should be able to add positions after deposit", async function() {
+            const { owner, manager, user, vault, token0 } = await helpers.loadFixture(deployTeaVaultV3Pair);
+
+            // set fees
+            const feeConfig = {
+                vault: owner.address,
+                entryFee: 1000,
+                exitFee: 2000,
+                performanceFee: 100000,
+                managementFee: 10000,
+            }
+
+            await vault.setFeeConfig(feeConfig);
+
+            // set manager
+            await vault.assignManager(manager.address);
+
+            // deposit
+            await token0.connect(user).approve(vault.address, "10000" + "0".repeat(await token0.decimals()));
+            const shares = "100" + "0".repeat(await vault.decimals());
+            await vault.connect(user).deposit(shares, UINT256_MAX, UINT256_MAX);
+
+            // get pool info
+            const factory = await ethers.getContractAt("IUniswapV3Factory", testFactory);
+            const poolAddr = await factory.getPool(testToken0, testToken1, testFeeTier);
+            const pool = await ethers.getContractAt("IUniswapV3Pool", poolAddr);
+            const slot0 = await pool.slot0();
+            const tickSpacing = await pool.tickSpacing();
+
+            const tickLower = Math.floor((slot0.tick - tickSpacing * 10) / tickSpacing) * tickSpacing;
+            const tickUpper = Math.ceil((slot0.tick + tickSpacing * 10) / tickSpacing) * tickSpacing;
+            // console.log(tickLower, tickUpper, tickSpacing);
+            // const r = await pool.callStatic.mint(manager.address, tickLower, tickUpper, 100, "0x");
+            // console.log(r);
+            // const result = await vault.connect(manager).callStatic.addLiquidity(
+            //     tickLower,
+            //     tickUpper,
+            //     100,
+            //     0,
+            //     0,
+            //     10000000000
+            // );
+            // console.log(result);
+        });
     })
 })
