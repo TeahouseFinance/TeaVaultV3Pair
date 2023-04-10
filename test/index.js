@@ -346,6 +346,11 @@ describe("TeaVaultV3Pair", function () {
             // expect withdrawn tokens to be > 95% of invested token0
             const investedToken0 = ethers.BigNumber.from("1100" + "0".repeat(await token0.decimals()));
             expect(totalIn0.toNumber()).to.greaterThan(investedToken0.mul(95).div(100).toNumber());
+
+            // remove the remaining share
+            const remainShares = await vault.balanceOf(owner.address);
+            await vault.withdraw(remainShares, 0, 0);
+            expect(await vault.totalSupply()).to.equal(0);
         });
     })
 })

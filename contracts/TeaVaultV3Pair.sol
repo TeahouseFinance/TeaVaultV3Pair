@@ -183,20 +183,26 @@ contract TeaVaultV3Pair is
         // make sure a user can't make a zero amount deposit
         if (depositedAmount0 == 0 && depositedAmount1 == 0) revert InvalidShareAmount();
 
-        // add entry fee
-        uint256 entryFeeAmount0 = depositedAmount0.mulDivRoundingUp(feeConfig.entryFee, FEE_MULTIPLIER);
-        uint256 entryFeeAmount1 = depositedAmount1.mulDivRoundingUp(feeConfig.entryFee, FEE_MULTIPLIER);
+        // collect entry fee for users
+        // do not collect entry fee for fee recipient
+        uint256 entryFeeAmount0 = 0;
+        uint256 entryFeeAmount1 = 0;
 
-        if (entryFeeAmount0 > 0) {
-            token0.safeTransferFrom(msg.sender, feeConfig.vault, entryFeeAmount0);
-        }
-        
-        if (entryFeeAmount1 > 0) {
-            token1.safeTransferFrom(msg.sender, feeConfig.vault, entryFeeAmount1);
-        }
+        if (msg.sender != feeConfig.vault) {
+            entryFeeAmount0 = depositedAmount0.mulDivRoundingUp(feeConfig.entryFee, FEE_MULTIPLIER);
+            entryFeeAmount1 = depositedAmount1.mulDivRoundingUp(feeConfig.entryFee, FEE_MULTIPLIER);
 
-        depositedAmount0 += entryFeeAmount0;
-        depositedAmount1 += entryFeeAmount1;
+            if (entryFeeAmount0 > 0) {
+                token0.safeTransferFrom(msg.sender, feeConfig.vault, entryFeeAmount0);
+            }
+            
+            if (entryFeeAmount1 > 0) {
+                token1.safeTransferFrom(msg.sender, feeConfig.vault, entryFeeAmount1);
+            }
+
+            depositedAmount0 += entryFeeAmount0;
+            depositedAmount1 += entryFeeAmount1;
+        }
 
         if (depositedAmount0 > _amount0Max || depositedAmount1 > _amount1Max) revert InvalidPriceSlippage(depositedAmount0, depositedAmount1);
         _mint(msg.sender, _shares);
@@ -213,13 +219,18 @@ contract TeaVaultV3Pair is
         if (_shares == 0) revert InvalidShareAmount();
         uint256 totalShares = totalSupply();
 
-        // calculate exit fee
-        uint256 exitFeeAmount = _shares.mulDivRoundingUp(feeConfig.exitFee, FEE_MULTIPLIER);
-        if (exitFeeAmount > 0) {
-            _transfer(msg.sender, feeConfig.vault, exitFeeAmount);
-        }
+        // collect exit fee for users
+        // do not collect exit fee for fee recipient
+        uint256 exitFeeAmount = 0;
+        if (msg.sender != feeConfig.vault) {
+            // calculate exit fee
+            exitFeeAmount = _shares.mulDivRoundingUp(feeConfig.exitFee, FEE_MULTIPLIER);
+            if (exitFeeAmount > 0) {
+                _transfer(msg.sender, feeConfig.vault, exitFeeAmount);
+            }
 
-        _shares -= exitFeeAmount;
+            _shares -= exitFeeAmount;
+        }
 
         _burn(msg.sender, _shares);
         _collectManagementFee();
@@ -236,7 +247,8 @@ contract TeaVaultV3Pair is
         withdrawnAmount0 = token0.balanceOf(address(this)).mulDiv(_shares, totalShares);
         withdrawnAmount1 = token1.balanceOf(address(this)).mulDiv(_shares, totalShares);
 
-        for (uint256 i = 0; i < positionLength; i++) {
+        uint256 i;
+        for (i = 0; i < positionLength; i++) {
             Position storage position = positions[i];
             int24 tickLower = position.tickLower;
             int24 tickUpper = position.tickUpper;
@@ -246,8 +258,23 @@ contract TeaVaultV3Pair is
             _collect(tickLower, tickUpper);
             withdrawnAmount0 += amount0;
             withdrawnAmount1 += amount1;
+
+            position.liquidity -= liquidity;
         }
 
+        // remove position entries with no liquidity
+        i = 0;
+        while(i < positions.length) {
+            if (positions[i].liquidity == 0) {
+                positions[i] = positions[positions.length - 1];
+                positions.pop();
+            }
+            else {
+                i++;
+            }
+        }
+
+        // slippage check
         if (withdrawnAmount0 < _amount0Min || withdrawnAmount1 < _amount1Min) revert InvalidPriceSlippage(withdrawnAmount0, withdrawnAmount1);
 
         token0.safeTransfer(msg.sender, withdrawnAmount0);
@@ -302,6 +329,9 @@ contract TeaVaultV3Pair is
         for (uint256 i = 0; i < positionLength; i++) {
             Position storage position = positions[i];
             if (position.tickLower == _tickLower && position.tickUpper == _tickUpper) {
+                // collect swap fee before remove liquidity to ensure correct calculation of performance fee
+                _collectPositionSwapFee(i);
+
                 (amount0, amount1) = _removeLiquidity(_tickLower, _tickUpper, _liquidity);
                 if (amount0 < _amount0Min || amount1 < _amount1Min) revert InvalidPriceSlippage(amount0, amount1);
                 _collect(_tickLower, _tickUpper);
@@ -331,27 +361,33 @@ contract TeaVaultV3Pair is
         for (uint256 i = 0; i < positionLength; i++) {
             Position storage position = positions[i];
             if (position.tickLower == _tickLower && position.tickUpper == _tickUpper) {
-                pool.burn(_tickLower, _tickUpper, 0);
-                (amount0, amount1) =  _collect(_tickLower, _tickUpper);
-
-                // collect performance fee
-                uint256 performanceFeeAmount0 = uint256(amount0).mulDivRoundingUp(feeConfig.performanceFee, 1000000);
-                uint256 performanceFeeAmount1 = uint256(amount1).mulDivRoundingUp(feeConfig.performanceFee, 1000000);
-
-                if (performanceFeeAmount0 > 0) {
-                    token0.safeTransfer(feeConfig.vault, performanceFeeAmount0);
-                }
-
-                if (performanceFeeAmount1 > 0) {
-                    token1.safeTransfer(feeConfig.vault, performanceFeeAmount1);
-                }
-
-                emit CollectSwapFees(address(pool), amount0, amount1, performanceFeeAmount0, performanceFeeAmount1);
-                return (amount0, amount1);
+                return _collectPositionSwapFee(i);
             }
         }
 
         revert PositionNotExist();
+    }
+
+    function _collectPositionSwapFee(uint256 p) internal returns(uint128 amount0, uint128 amount1) {
+        Position storage position = positions[p];
+
+        pool.burn(position.tickLower, position.tickUpper, 0);
+        (amount0, amount1) =  _collect(position.tickLower, position.tickUpper);
+
+        // collect performance fee
+        uint256 performanceFeeAmount0 = uint256(amount0).mulDivRoundingUp(feeConfig.performanceFee, 1000000);
+        uint256 performanceFeeAmount1 = uint256(amount1).mulDivRoundingUp(feeConfig.performanceFee, 1000000);
+
+        if (performanceFeeAmount0 > 0) {
+            token0.safeTransfer(feeConfig.vault, performanceFeeAmount0);
+        }
+
+        if (performanceFeeAmount1 > 0) {
+            token1.safeTransfer(feeConfig.vault, performanceFeeAmount1);
+        }
+
+        emit CollectSwapFees(address(pool), amount0, amount1, performanceFeeAmount0, performanceFeeAmount1);
+        return (amount0, amount1);
     }
 
     /// @inheritdoc ITeaVaultV3Pair
