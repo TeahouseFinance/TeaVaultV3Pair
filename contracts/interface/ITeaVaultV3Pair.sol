@@ -17,7 +17,7 @@ interface ITeaVaultV3Pair {
     error TransactionExpired();
     error InvalidSwapToken();
     error InvalidSwapReceiver();
-    error InsufficientSwapResult();
+    error InsufficientSwapResult(uint256 minAmount, uint256 convertedAmount);
     error InvalidTokenOrder();
 
     event TeaVaultV3PairCreated(address indexed teaVaultAddress);

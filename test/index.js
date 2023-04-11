@@ -1,5 +1,6 @@
 const helpers = require("@nomicfoundation/hardhat-network-helpers");
 const { expect } = require("chai");
+const { providers } = require("ethers");
 const { network, ethers, upgrades } = require("hardhat");
 
 
@@ -30,6 +31,8 @@ const testFeeTier = loadEnvVarInt(process.env.UNISWAP_TEST_FEE_TIER, "No UNISWAP
 const testDecimalOffset = loadEnvVarInt(process.env.UNISWAP_TEST_DECIMAL_OFFSET, "No UNISWAP_TEST_DECIMAL_OFFSET");
 const testToken0Whale = loadEnvVar(process.env.UNISWAP_TEST_TOKEN0_WHALE, "No UNISWAP_TEST_TOKEN0_WHALE");
 const testToken1Whale = loadEnvVar(process.env.UNISWAP_TEST_TOKEN1_WHALE, "No UNISWAP_TEST_TOKEN1_WHALE");
+const test1InchRouter = loadEnvVar(process.env.UNISWAP_TEST_1INCH_ROUTER, "No UNISWAP_TEST_1INCH_ROUTER");
+const test1InchExecutor = loadEnvVar(process.env.UNISWAP_TEST_1INCH_EXECUTOR, "No UNISWAP_TEST_1INCH_EXECUTOR");
 
 const UINT256_MAX = '0x' + 'f'.repeat(64);
 const UINT64_MAX = '0x' + 'f'.repeat(16);
@@ -373,6 +376,86 @@ describe("TeaVaultV3Pair", function () {
 
             // positions should be empty
             expect(await vault.getAllPositions()).to.eql([]);
+        });
+
+        it("Should be able to swap using 1Inch router", async function() {
+            const { owner, manager, user, vault, token0, token1 } = await helpers.loadFixture(deployTeaVaultV3Pair);
+
+            // set fees
+            const feeConfig = {
+                vault: owner.address,
+                entryFee: 1000,
+                exitFee: 2000,
+                performanceFee: 100000,
+                managementFee: 0,
+            }
+
+            await vault.setFeeConfig(feeConfig);
+
+            // set 1inch router address
+            await vault.assignRouter1Inch(test1InchRouter);
+
+            // set manager
+            await vault.assignManager(manager.address);
+
+            // deposit
+            await token0.connect(user).approve(vault.address, "10000" + "0".repeat(await token0.decimals()));
+            await token1.connect(user).approve(vault.address, "10000" + "0".repeat(await token1.decimals()));
+            const shares = "100" + "0".repeat(await vault.decimals());
+            await vault.connect(user).deposit(shares, UINT256_MAX, UINT256_MAX);
+
+            // unoswap data
+            // const data = "0x0502b1c5000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb480000000000000000000000000000000000000000000000000000000002faf080000000000000000000000000000000000000000000000000005b39c7bf3723b40000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000000100000000000000003b6d0340b4e16d0168e52d35cacd2c6185b44281ec28c9dccfee7c08";           
+            // const decoded = vault.interface.decodeFunctionData("unoswap", data);
+            // await vault.connect(manager).unoswap(
+            //     decoded.srcToken,
+            //     decoded.amount,
+            //     decoded.minReturn,
+            //     decoded.pools
+            // );
+
+            // uniswapv3 data
+            // const data = "0xe449022e0000000000000000000000000000000000000000000000000000000002faf080000000000000000000000000000000000000000000000000005badeac783afdb00000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000001000000000000000000000000e0554a476a092703abdb3ef35c80e0d76d32939fcfee7c08";
+            // const decoded = vault.interface.decodeFunctionData("uniswapV3Swap", data);
+            // await vault.connect(manager).uniswapV3Swap(
+            //     decoded.amount,
+            //     decoded.minReturn,
+            //     decoded.pools
+            // );
+
+            // test in-place swap
+            const amountIn = "50" + "0".repeat(await token0.decimals());
+            const amountOut = await vault.connect(manager).callStatic.swapInputSingle(
+                true,
+                amountIn,
+                0,
+                0,
+                UINT64_MAX
+            );
+
+            // swap data
+            const data = "0x12aa3caf0000000000000000000000007122db0ebe4eb9b434a9f2ffe6760bc03bfbd0e0000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000007122db0ebe4eb9b434a9f2ffe6760bc03bfbd0e000000000000000000000000047ac0fb4f2d84898e4d9e7b4dab3c24507a6d5030000000000000000000000000000000000000000000000000000000002faf080000000000000000000000000000000000000000000000000005e68a54e2a8a67000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000160000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001360000000000000000000000000000000000000000000001180000ea0000d0512061bb2fda13600c497272a8dd029313afdb125fd3a0b86991c6218b36c1d19d4a2e9eb0ce3606eb480044d5bcb9b5000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb4800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005e68a54e2a8a6700000000000000000000000042f527f50f16a103b6ccab48bccca214500c10214041c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2d0e30db080a06c4eca27c02aaa39b223fe8d0a0e5c4f27ead9083c756cc21111111254eeb25477b68fb85ed929f73a96058200000000000000000000cfee7c08"
+            const decoded = vault.interface.decodeFunctionData("swap", data);
+            const desc = {
+                srcToken: decoded.desc.srcToken,
+                dstToken: decoded.desc.dstToken,
+                srcReceiver: decoded.desc.srcReceiver,
+                dstReceiver: vault.address,
+                amount: amountIn,
+                minReturnAmount: decoded.desc.minReturnAmount,
+                flags: decoded.desc.flags
+            };
+            const token1Before = await token1.balanceOf(vault.address);
+            await vault.connect(manager).swap(
+                decoded.executor,
+                desc,
+                decoded.permit,
+                decoded.data                
+            );
+            const token1After = await token1.balanceOf(vault.address);
+
+            // if successful, swap amount should be larger than in-place swap
+            expect(token1After.sub(token1Before).gt(amountOut)).to.be.true;
         });
     })
 })
