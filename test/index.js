@@ -359,6 +359,9 @@ describe("TeaVaultV3Pair", function () {
             const remainShares = await vault.balanceOf(owner.address);
             await vault.withdraw(remainShares, 0, 0);
             expect(await vault.totalSupply()).to.equal(0);
+
+            // positions should be empty
+            expect(await vault.getAllPositions()).to.eql([]);
         });
     })
 })

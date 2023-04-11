@@ -152,6 +152,7 @@ contract TeaVaultV3Pair is
         _collectManagementFee();
 
         if (totalShares == 0) {
+            // vault is empty, default to 1:1 share to token0 ratio (offseted by _decimalOffset)
             depositedAmount0 = _shares / DECIMALS_MULTIPLIER;
             token0.safeTransferFrom(msg.sender, address(this), depositedAmount0);
         }
@@ -208,6 +209,7 @@ contract TeaVaultV3Pair is
             depositedAmount1 += entryFeeAmount1;
         }
 
+        // price slippage check
         if (depositedAmount0 > _amount0Max || depositedAmount1 > _amount1Max) revert InvalidPriceSlippage(depositedAmount0, depositedAmount1);
         _mint(msg.sender, _shares);
 
@@ -334,7 +336,7 @@ contract TeaVaultV3Pair is
             Position storage position = positions[i];
             if (position.tickLower == _tickLower && position.tickUpper == _tickUpper) {
                 // collect swap fee before remove liquidity to ensure correct calculation of performance fee
-                _collectPositionSwapFee(i);
+                _collectPositionSwapFee(position);
 
                 (amount0, amount1) = _removeLiquidity(_tickLower, _tickUpper, _liquidity);
                 if (amount0 < _amount0Min || amount1 < _amount1Min) revert InvalidPriceSlippage(amount0, amount1);
@@ -365,33 +367,18 @@ contract TeaVaultV3Pair is
         for (uint256 i = 0; i < positionLength; i++) {
             Position storage position = positions[i];
             if (position.tickLower == _tickLower && position.tickUpper == _tickUpper) {
-                return _collectPositionSwapFee(i);
+                return _collectPositionSwapFee(position);
             }
         }
 
         revert PositionNotExist();
     }
 
-    function _collectPositionSwapFee(uint256 p) internal returns(uint128 amount0, uint128 amount1) {
-        Position storage position = positions[p];
-
+    function _collectPositionSwapFee(Position storage position) internal returns(uint128 amount0, uint128 amount1) {
         pool.burn(position.tickLower, position.tickUpper, 0);
         (amount0, amount1) =  _collect(position.tickLower, position.tickUpper);
 
-        // collect performance fee
-        uint256 performanceFeeAmount0 = uint256(amount0).mulDivRoundingUp(feeConfig.performanceFee, 1000000);
-        uint256 performanceFeeAmount1 = uint256(amount1).mulDivRoundingUp(feeConfig.performanceFee, 1000000);
-
-        if (performanceFeeAmount0 > 0) {
-            token0.safeTransfer(feeConfig.vault, performanceFeeAmount0);
-        }
-
-        if (performanceFeeAmount1 > 0) {
-            token1.safeTransfer(feeConfig.vault, performanceFeeAmount1);
-        }
-
-        emit CollectSwapFees(address(pool), amount0, amount1, performanceFeeAmount0, performanceFeeAmount1);
-        return (amount0, amount1);
+        _collectPerformanceFee(amount0, amount1);
     }
 
     /// @inheritdoc ITeaVaultV3Pair
@@ -414,9 +401,12 @@ contract TeaVaultV3Pair is
             }
         }
 
-        // collect performance fee
-        uint256 performanceFeeAmount0 = uint256(amount0).mulDivRoundingUp(feeConfig.performanceFee, 1000000);
-        uint256 performanceFeeAmount1 = uint256(amount1).mulDivRoundingUp(feeConfig.performanceFee, 1000000);
+        _collectPerformanceFee(amount0, amount1);
+    }
+
+    function _collectPerformanceFee(uint128 amount0, uint128 amount1) internal {
+        uint256 performanceFeeAmount0 = uint256(amount0).mulDivRoundingUp(feeConfig.performanceFee, FEE_MULTIPLIER);
+        uint256 performanceFeeAmount1 = uint256(amount1).mulDivRoundingUp(feeConfig.performanceFee, FEE_MULTIPLIER);
 
         if (performanceFeeAmount0 > 0) {
             token0.safeTransfer(feeConfig.vault, performanceFeeAmount0);
@@ -426,7 +416,7 @@ contract TeaVaultV3Pair is
             token1.safeTransfer(feeConfig.vault, performanceFeeAmount1);
         }
 
-        emit CollectSwapFees(address(pool), amount0, amount1, performanceFeeAmount0, performanceFeeAmount1);        
+        emit CollectSwapFees(address(pool), amount0, amount1, performanceFeeAmount0, performanceFeeAmount1);
     }
 
     function _addLiquidity(
