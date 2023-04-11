@@ -67,9 +67,13 @@ describe("TeaVaultV3Pair", function () {
         const VaultUtils = await ethers.getContractFactory("VaultUtils");
         const vaultUtils = await VaultUtils.deploy();
 
+        const GenericRouter1Inch = await ethers.getContractFactory("GenericRouter1Inch");
+        const genericRouter1Inch = await GenericRouter1Inch.deploy();
+
         const TeaVaultV3Pair = await ethers.getContractFactory("TeaVaultV3Pair", {
             libraries: {
                 VaultUtils: vaultUtils.address,
+                GenericRouter1Inch: genericRouter1Inch.address,
             },
         });
 

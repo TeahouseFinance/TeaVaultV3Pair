@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Teahouse Finance
+
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -7,6 +8,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeCastUpgradeable.sol";
 
@@ -17,11 +19,11 @@ import "@uniswap/v3-core/contracts/libraries/FullMath.sol";
 import "@uniswap/v3-periphery/contracts/libraries/PoolAddress.sol";
 
 import "./interface/ITeaVaultV3Pair.sol";
-import "./VaultUtils.sol";
-
 import "./interface/IGenericRouter1Inch.sol";
+import "./VaultUtils.sol";
+import "./GenericRouter1Inch.sol";
 
-import "hardhat/console.sol";
+//import "hardhat/console.sol";
 
 contract TeaVaultV3Pair is
     Initializable,
@@ -619,7 +621,6 @@ contract TeaVaultV3Pair is
         amount0 = amount0 + token0.balanceOf(address(this));
         amount1 = amount1 + token1.balanceOf(address(this));
     }
-    
 
     /// @inheritdoc ITeaVaultV3Pair
     function estimatedValueInToken0() external override view returns (uint256 value0) {
@@ -657,7 +658,7 @@ contract TeaVaultV3Pair is
         return positions;
     }
 
-    /// @notice swap tokens using 1Inch router
+    /// @notice swap tokens using 1Inch router via ClipperRouter
     /// @param srcToken Source token
     /// @param dstToken Destination token
     /// @param inputAmount Amount of source tokens to swap
@@ -675,45 +676,30 @@ contract TeaVaultV3Pair is
         uint256 goodUntil,
         bytes32 r,
         bytes32 vs
-    ) external onlyManager returns(uint256 returnAmount) {
-        if ((srcToken != address(token0) && srcToken != address(token1)) ||
-            (dstToken != address(token0) && dstToken != address(token1)) ||
-            srcToken == dstToken) {
+    ) external nonReentrant onlyManager returns(uint256 returnAmount) {
+        if (srcToken != address(token0) && srcToken != address(token1)) {
             revert InvalidSwapToken();
         }
 
-        uint256 minAmount;
-        if (srcToken == address(token0)) {
-            // simulate using uniswap
-            minAmount = simulateSwapInputSingle(true, inputAmount);
-
-            // perform actual swap
-            token0.safeApprove(address(router1Inch), inputAmount);
-            uint256 token1BalanceBefore = token1.balanceOf(address(this));
-            returnAmount = router1Inch.clipperSwap(clipperExchange, srcToken, dstToken, inputAmount, outputAmount, goodUntil, r, vs);
-            uint256 token1BalanceAfter = token1.balanceOf(address(this));
-            uint256 convertedAmount = token1BalanceAfter - token1BalanceBefore;
-            if (convertedAmount < minAmount) {
-                revert InsufficientSwapResult(minAmount, convertedAmount);
-            }
-        }
-        else {
-            // simulate using uniswap
-            minAmount = simulateSwapInputSingle(false, inputAmount);
-
-            // perform actual swap
-            token1.safeApprove(address(router1Inch), inputAmount);
-            uint256 token0BalanceBefore = token0.balanceOf(address(this));
-            returnAmount = router1Inch.clipperSwap(clipperExchange, srcToken, dstToken, inputAmount, outputAmount, goodUntil, r, vs);
-            uint256 token0BalanceAfter = token0.balanceOf(address(this));
-            uint256 convertedAmount = token0BalanceAfter - token0BalanceBefore;
-            if (convertedAmount < minAmount) {
-                revert InsufficientSwapResult(minAmount, convertedAmount);
-            }
-        }
+        // simulate using uniswap to find a safe minimum amount
+        uint256 minAmount = simulateSwapInputSingle(srcToken == address(token0), inputAmount);
+        return GenericRouter1Inch.clipperSwap(
+            router1Inch,
+            IERC20Upgradeable(token0),
+            IERC20Upgradeable(token1),
+            minAmount,
+            clipperExchange,
+            srcToken,
+            dstToken,
+            inputAmount,
+            outputAmount,
+            goodUntil,
+            r,
+            vs
+        );
     }
 
-    /// @notice swap tokens using 1Inch router
+    /// @notice swap tokens using 1Inch router via GenericRouter
     /// @param executor Aggregation executor that executes calls described in `data`
     /// @param desc Swap description
     /// @param permit Should contain valid permit that can be used in `IERC20Permit.permit` calls.
@@ -725,49 +711,25 @@ contract TeaVaultV3Pair is
         IGenericRouter1Inch.SwapDescription calldata desc,
         bytes calldata permit,
         bytes calldata data
-    ) external onlyManager returns (uint256 returnAmount, uint256 spentAmount) {
-        if ((desc.srcToken != address(token0) && desc.srcToken != address(token1)) ||
-            (desc.dstToken != address(token0) && desc.dstToken != address(token1)) ||
-            desc.srcToken == desc.dstToken) {
+    ) external nonReentrant onlyManager returns (uint256 returnAmount, uint256 spentAmount) {
+        if (desc.srcToken != address(token0) && desc.srcToken != address(token1)) {
             revert InvalidSwapToken();
         }
 
-        if (desc.dstReceiver != address(this)) {
-            revert InvalidSwapReceiver();
-        }
-
-        uint256 minAmount;
-        if (desc.srcToken == address(token0)) {
-            // simulate using uniswap
-            minAmount = simulateSwapInputSingle(true, desc.amount);
-
-            // perform actual swap
-            token0.safeApprove(address(router1Inch), desc.amount);
-            uint256 token1BalanceBefore = token1.balanceOf(address(this));
-            (returnAmount, spentAmount) = router1Inch.swap(executor, desc, permit, data);
-            uint256 token1BalanceAfter = token1.balanceOf(address(this));
-            uint256 convertedAmount = token1BalanceAfter - token1BalanceBefore;
-            if (convertedAmount < minAmount) {
-                revert InsufficientSwapResult(minAmount, convertedAmount);
-            }
-        }
-        else {
-            // simulate using uniswap
-            minAmount = simulateSwapInputSingle(false, desc.amount);
-
-            // perform actual swap
-            token1.safeApprove(address(router1Inch), desc.amount);
-            uint256 token0BalanceBefore = token0.balanceOf(address(this));
-            (returnAmount, spentAmount) = router1Inch.swap(executor, desc, permit, data);
-            uint256 token0BalanceAfter = token0.balanceOf(address(this));
-            uint256 convertedAmount = token0BalanceAfter - token0BalanceBefore;
-            if (convertedAmount < minAmount) {
-                revert InsufficientSwapResult(minAmount, convertedAmount);
-            }
-        }
+        uint256 minAmount = simulateSwapInputSingle(desc.srcToken == address(token0), desc.amount);
+        return GenericRouter1Inch.swap(
+            router1Inch,
+            IERC20Upgradeable(token0),
+            IERC20Upgradeable(token1),
+            minAmount,
+            executor,
+            desc,
+            permit,
+            data
+        );
     }
 
-    /// @notice Swap tokens using 1Inch router via unoswap
+    /// @notice Swap tokens using 1Inch router via unoswap (for UniswapV2)
     /// @param srcToken Source token
     /// @param amount Amount of source tokens to swap
     /// @param minReturn Minimal allowed returnAmount to make transaction commit
@@ -777,40 +739,22 @@ contract TeaVaultV3Pair is
         uint256 amount,
         uint256 minReturn,
         uint256[] calldata pools
-    ) external onlyManager returns(uint256 returnAmount) {
+    ) external nonReentrant onlyManager returns(uint256 returnAmount) {
         if (srcToken != address(token0) && srcToken != address(token1)) {
             revert InvalidSwapToken();
         }
 
-        uint256 minAmount;
-        if (srcToken == address(token0)) {
-            // simulate using uniswap
-            minAmount = simulateSwapInputSingle(true, amount);
-
-            // perform actual swap
-            token0.safeApprove(address(router1Inch), amount);
-            uint256 token1BalanceBefore = token1.balanceOf(address(this));
-            (returnAmount) = router1Inch.unoswap(srcToken, amount, minReturn, pools);
-            uint256 token1BalanceAfter = token1.balanceOf(address(this));
-            uint256 convertedAmount = token1BalanceAfter - token1BalanceBefore;
-            if (convertedAmount < minAmount) {
-                revert InsufficientSwapResult(minAmount, convertedAmount);
-            }
-        }
-        else {
-            // simulate using uniswap
-            minAmount = simulateSwapInputSingle(false, amount);
-
-            // perform actual swap
-            token1.safeApprove(address(router1Inch), amount);
-            uint256 token0BalanceBefore = token0.balanceOf(address(this));
-            (returnAmount) = router1Inch.unoswap(srcToken, amount, minReturn, pools);
-            uint256 token0BalanceAfter = token0.balanceOf(address(this));
-            uint256 convertedAmount = token0BalanceAfter - token0BalanceBefore;
-            if (convertedAmount < minAmount) {
-                revert InsufficientSwapResult(minAmount, convertedAmount);
-            }
-        }
+        uint256 minAmount = simulateSwapInputSingle(srcToken == address(token0), amount);
+        return GenericRouter1Inch.unoswap(
+            router1Inch,
+            IERC20Upgradeable(token0),
+            IERC20Upgradeable(token1),
+            minAmount,
+            srcToken,
+            amount,
+            minReturn,
+            pools            
+        );
     }
 
     /// @notice Swap tokens using 1Inch router via UniswapV3
@@ -821,7 +765,7 @@ contract TeaVaultV3Pair is
         uint256 amount,
         uint256 minReturn,
         uint256[] calldata pools
-    ) external onlyManager returns(uint256 returnAmount) {
+    ) external nonReentrant onlyManager returns(uint256 returnAmount) {
         uint256 poolData = pools[0];
         bool zeroForOne = poolData & (1 << 255) == 0;
         IUniswapV3Pool swapPool = IUniswapV3Pool(address(uint160(poolData)));
@@ -831,37 +775,24 @@ contract TeaVaultV3Pair is
             revert InvalidSwapToken();
         }
 
-        uint256 minAmount;
-        if (srcToken == address(token0)) {
-            // simulate using uniswap
-            minAmount = simulateSwapInputSingle(true, amount);
-
-            // perform actual swap
-            token0.safeApprove(address(router1Inch), amount);
-            uint256 token1BalanceBefore = token1.balanceOf(address(this));
-            (returnAmount) = router1Inch.uniswapV3Swap(amount, minReturn, pools);
-            uint256 token1BalanceAfter = token1.balanceOf(address(this));
-            uint256 convertedAmount = token1BalanceAfter - token1BalanceBefore;
-            if (convertedAmount < minAmount) {
-                revert InsufficientSwapResult(minAmount, convertedAmount);
-            }
-        }
-        else {
-            // simulate using uniswap
-            minAmount = simulateSwapInputSingle(false, amount);
-
-            // perform actual swap
-            token1.safeApprove(address(router1Inch), amount);
-            uint256 token0BalanceBefore = token0.balanceOf(address(this));
-            (returnAmount) = router1Inch.uniswapV3Swap(amount, minReturn, pools);
-            uint256 token0BalanceAfter = token0.balanceOf(address(this));
-            uint256 convertedAmount = token0BalanceAfter - token0BalanceBefore;
-            if (convertedAmount < minAmount) {
-                revert InsufficientSwapResult(minAmount, convertedAmount);
-            }
-        }
+        // simulate using uniswap
+        uint256 minAmount = simulateSwapInputSingle(srcToken == address(token0), amount);
+        return GenericRouter1Inch.uniswapV3Swap(
+            router1Inch,
+            IERC20Upgradeable(token0),
+            IERC20Upgradeable(token1),
+            srcToken == address(token0),
+            minAmount,
+            amount,
+            minReturn,
+            pools
+        );
     }
 
+    /// @notice Simulate in-place swap
+    /// @param _zeroForOne Swap direction from token0 to token1 or not
+    /// @param _amountIn Amount of input token
+    /// @return amountOut Output token amount
     function simulateSwapInputSingle(bool _zeroForOne, uint256 _amountIn) internal returns (uint256 amountOut) {
         (bool success, bytes memory returndata) = address(this).delegatecall(
             abi.encodeWithSignature("simulateSwapInputSingleInternal(bool,uint256)", _zeroForOne, _amountIn));
@@ -880,6 +811,8 @@ contract TeaVaultV3Pair is
         }
     }
 
+    /// @dev Helper function for simulating in-place swap
+    /// @dev This function always revert, so there's no point calling it directly
     function simulateSwapInputSingleInternal(bool _zeroForOne, uint256 _amountIn) external onlyManager {
         callbackStatus = 2;
         (bool success, bytes memory returndata) = address(pool).call(

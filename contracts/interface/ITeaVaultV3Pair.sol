@@ -1,24 +1,25 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Teahouse Finance
+
 pragma solidity ^0.8.0;
 
-interface ITeaVaultV3Pair {
+error InvalidFeePercentage();
+error InvalidShareAmount();
+error PositionLengthExceedsLimit();
+error InvalidPriceSlippage(uint256 amount0, uint256 amount1);
+error PositionDoesNotExist();
+error ZeroLiquidity();
+error CallerIsNotManager();
+error InvalidCallbackStatus();
+error InvalidCallbackCaller();
+error SwapInZeroLiquidityRegion();
+error TransactionExpired();
+error InvalidSwapToken();
+error InvalidSwapReceiver();
+error InsufficientSwapResult(uint256 minAmount, uint256 convertedAmount);
+error InvalidTokenOrder();
 
-    error InvalidFeePercentage();
-    error InvalidShareAmount();
-    error PositionLengthExceedsLimit();
-    error InvalidPriceSlippage(uint256 amount0, uint256 amount1);
-    error PositionDoesNotExist();
-    error ZeroLiquidity();
-    error CallerIsNotManager();
-    error InvalidCallbackStatus();
-    error InvalidCallbackCaller();
-    error SwapInZeroLiquidityRegion();
-    error TransactionExpired();
-    error InvalidSwapToken();
-    error InvalidSwapReceiver();
-    error InsufficientSwapResult(uint256 minAmount, uint256 convertedAmount);
-    error InvalidTokenOrder();
+interface ITeaVaultV3Pair {
 
     event TeaVaultV3PairCreated(address indexed teaVaultAddress);
     event FeeConfigChanged(address indexed sender, uint256 timestamp, FeeConfig feeConfig);
