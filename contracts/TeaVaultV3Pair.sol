@@ -68,6 +68,10 @@ contract TeaVaultV3Pair is
         __Ownable_init();
         __ReentrancyGuard_init();
         __ERC20_init(_name, _symbol);
+
+        if (_token0 >= _token1) {
+            revert InvalidTokenOrder();
+        }
         
         SECONDS_IN_A_YEAR = 365 * 24 * 60 * 60;
         DECIMALS_MULTIPLIER = 10 ** _decimalOffset;
@@ -612,6 +616,8 @@ contract TeaVaultV3Pair is
         (uint256 _amount0, uint256 _amount1, uint256 _fee0, uint256 _fee1) = allPositionInfo();
         amount0 = _amount0 + _fee0;
         amount1 = _amount1 + _fee1;
+        amount0 = amount0 + token0.balanceOf(address(this));
+        amount1 = amount1 + token1.balanceOf(address(this));
     }
     
 

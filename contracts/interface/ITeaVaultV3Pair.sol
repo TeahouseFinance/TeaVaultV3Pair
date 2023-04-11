@@ -18,6 +18,7 @@ interface ITeaVaultV3Pair {
     error InvalidSwapToken();
     error InvalidSwapReceiver();
     error InsufficientSwapResult();
+    error InvalidTokenOrder();
 
     event TeaVaultV3PairCreated(address indexed teaVaultAddress);
     event FeeConfigChanged(address indexed sender, uint256 timestamp, FeeConfig feeConfig);

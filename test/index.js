@@ -336,6 +336,19 @@ describe("TeaVaultV3Pair", function () {
             const position1 = await vault.positions(1);
             await vault.connect(manager).removeLiquidity(position1.tickLower, position1.tickUpper, position1.liquidity, 0, 0, UINT64_MAX);
 
+            // check vault values
+            const investedToken0 = ethers.BigNumber.from("1100" + "0".repeat(await token0.decimals()));            
+            const values = await vault.vaultAllUnderlyingAssets();
+            // expect amount0 to be > 45% of invested token0
+            expect(values.amount0.gt(investedToken0.mul(45).div(100))).to.be.true;
+            
+            const valueInToken0 = await vault.estimatedValueInToken0();
+            const valueInToken1 = await vault.estimatedValueInToken1();
+            // expect total value in token0 to be > 95% of invested token0
+            expect(valueInToken0.gt(investedToken0.mul(95).div(100))).to.be.true;
+            // expect total value in token1 to be > 190% of value in token1
+            expect(valueInToken1.gt(values.amount1.mul(190).div(100))).to.be.true;
+
             // withdraw
             const amount0Before = await token0.balanceOf(user.address);
             const amount1Before = await token1.balanceOf(user.address);
@@ -346,15 +359,12 @@ describe("TeaVaultV3Pair", function () {
 
             expect(await vault.balanceOf(user.address)).to.equal(0);
             const amount0Diff = amount0After.sub(amount0Before);
-
             const amount1Diff = amount1After.sub(amount1Before);
-
             const price = slot0.sqrtPriceX96.mul(slot0.sqrtPriceX96);
             const totalIn0 = amount1Diff.mul(ethers.BigNumber.from(2).pow(192)).div(price).add(amount0Diff);
 
             // expect withdrawn tokens to be > 95% of invested token0
-            const investedToken0 = ethers.BigNumber.from("1100" + "0".repeat(await token0.decimals()));
-            expect(totalIn0.toNumber()).to.greaterThan(investedToken0.mul(95).div(100).toNumber());
+            expect(totalIn0.gt(investedToken0.mul(95).div(100))).to.be.true;
 
             // remove the remaining share
             const remainShares = await vault.balanceOf(owner.address);

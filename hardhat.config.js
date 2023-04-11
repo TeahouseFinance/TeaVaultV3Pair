@@ -32,6 +32,9 @@ module.exports = {
                 enabled: true,
                 runs: 200,
             },
+            // debug: {
+            //     revertStrings: "strip",
+            // },
         },
     },
     networks: {
