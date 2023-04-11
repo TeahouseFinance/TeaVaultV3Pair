@@ -1,21 +1,26 @@
 // SPDX-License-Identifier: BUSL-1.1
+// Teahouse Finance
 pragma solidity ^0.8.0;
 
-error InvalidFeePercentage();
-error InvalidShareAmount();
-error PositionLengthExceedsLimit();
-error InvalidPriceSlippage(uint256 amount0, uint256 amount1);
-error PositionNotExist();
-error ZeroLiquidity();
-error CallerIsNotManager();
-error InvalidCallbackStatus();
-error InvalidCallbackCaller();
-error SwapInZeroLiquidityRegion();
-error TransactionExpired();
-
 interface ITeaVaultV3Pair {
+
+    error InvalidFeePercentage();
+    error InvalidShareAmount();
+    error PositionLengthExceedsLimit();
+    error InvalidPriceSlippage(uint256 amount0, uint256 amount1);
+    error PositionDoesNotExist();
+    error ZeroLiquidity();
+    error CallerIsNotManager();
+    error InvalidCallbackStatus();
+    error InvalidCallbackCaller();
+    error SwapInZeroLiquidityRegion();
+    error TransactionExpired();
+    error InvalidSwapToken();
+    error InvalidSwapReceiver();
+    error InsufficientSwapResult();
+
     event TeaVaultV3PairCreated(address indexed teaVaultAddress);
-    event FeeConfigChanged(address indexed caller, uint256 timestamp, FeeConfig feeConfig);
+    event FeeConfigChanged(address indexed sender, uint256 timestamp, FeeConfig feeConfig);
     event ManagerChanged(address indexed sender, address indexed newManager);
     event ManagementFeeCollected(uint256 shares);
     event DepositShares(address indexed shareOwner, uint256 shares, uint256 amount0, uint256 amount1, uint256 feeAmount0, uint256 feeAmount1);
@@ -49,9 +54,6 @@ interface ITeaVaultV3Pair {
         int24 tickUpper;
         uint128 liquidity;
     }
-
-    function assetToken0() external returns (address);
-    function assetToken1() external returns (address);
 
     /// @notice Set fee structure and vault addresses
     /// @notice Only available to admins

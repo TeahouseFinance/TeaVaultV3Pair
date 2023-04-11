@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
+// Teahouse Finance
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -17,6 +18,8 @@ import "@uniswap/v3-periphery/contracts/libraries/PoolAddress.sol";
 
 import "./interface/ITeaVaultV3Pair.sol";
 import "./VaultUtils.sol";
+
+import "./interface/IGenericRouter1Inch.sol";
 
 //import "hardhat/console.sol";
 
@@ -43,11 +46,13 @@ contract TeaVaultV3Pair is
     FeeConfig public feeConfig;
 
     IUniswapV3Pool public pool;
-    ERC20Upgradeable internal token0;
-    ERC20Upgradeable internal token1;
+    ERC20Upgradeable public token0;
+    ERC20Upgradeable public token1;
 
     uint256 private callbackStatus;
     uint256 public lastCollectManagementFee;
+
+    IGenericRouter1Inch public router1Inch;
 
     function initialize(
         string calldata _name,
@@ -87,14 +92,6 @@ contract TeaVaultV3Pair is
         return DECIMALS;
     }
 
-    function assetToken0() external view returns (address) {
-        return address(token0);
-    }
-
-    function assetToken1() external view returns (address) {
-        return address(token1);
-    }
-
     /// @inheritdoc ITeaVaultV3Pair
     function setFeeConfig(FeeConfig calldata _feeConfig) external override onlyOwner {
         if (_feeConfig.entryFee + _feeConfig.exitFee > FEE_MULTIPLIER) revert InvalidFeePercentage();
@@ -110,6 +107,10 @@ contract TeaVaultV3Pair is
     function assignManager(address _manager) external override onlyOwner {
         manager = _manager;
         emit ManagerChanged(msg.sender, _manager);
+    }
+
+    function assignRouter1Inch(address _router1Inch) external onlyOwner {
+        router1Inch = IGenericRouter1Inch(_router1Inch);
     }
 
     /// @inheritdoc ITeaVaultV3Pair
@@ -354,7 +355,7 @@ contract TeaVaultV3Pair is
             }
         }
 
-        revert PositionNotExist();
+        revert PositionDoesNotExist();
     }
 
     /// @inheritdoc ITeaVaultV3Pair
@@ -371,7 +372,7 @@ contract TeaVaultV3Pair is
             }
         }
 
-        revert PositionNotExist();
+        revert PositionDoesNotExist();
     }
 
     function _collectPositionSwapFee(Position storage position) internal returns(uint128 amount0, uint128 amount1) {
@@ -579,14 +580,14 @@ contract TeaVaultV3Pair is
             }
         }
 
-        revert PositionNotExist();
+        revert PositionDoesNotExist();
     }
 
     /// @inheritdoc ITeaVaultV3Pair
     function positionInfo(
         uint256 _index
     ) external override view returns (uint256 amount0, uint256 amount1, uint256 fee0, uint256 fee1) {
-        if (_index >= positions.length) revert PositionNotExist();
+        if (_index >= positions.length) revert PositionDoesNotExist();
         return VaultUtils.positionInfo(address(this), pool, positions[_index]);
     }
 
@@ -648,6 +649,103 @@ contract TeaVaultV3Pair is
     /// @inheritdoc ITeaVaultV3Pair
     function getAllPositions() external view returns (Position[] memory results) {
         return positions;
+    }
+
+    /// @notice swap tokens using 1Inch router
+    /// @param executor Aggregation executor that executes calls described in `data`
+    /// @param desc Swap description
+    /// @param permit Should contain valid permit that can be used in `IERC20Permit.permit` calls.
+    /// @param data Encoded calls that `caller` should execute in between of swaps
+    /// @return returnAmount Resulting token amount
+    /// @return spentAmount Source token amount        
+    function swap(
+        address executor,
+        IGenericRouter1Inch.SwapDescription calldata desc,
+        bytes calldata permit,
+        bytes calldata data
+    ) external onlyManager returns (uint256 returnAmount, uint256 spentAmount) {
+        if (desc.srcToken != address(token0) || desc.srcToken != address(token1) ||
+            desc.dstToken != address(token0) || desc.dstToken != address(token1) ||
+            desc.srcToken == desc.dstToken) {
+            revert InvalidSwapToken();
+        }
+
+        if (desc.srcReceiver != address(this) || desc.dstReceiver != address(this)) {
+            revert InvalidSwapReceiver();
+        }
+
+        // simulate using uniswap
+        uint256 minAmount;
+        if (desc.srcToken == address(token0)) {
+            minAmount = simulateSwapInputSingle(true, desc.amount);
+
+            // perform actual swap
+            token0.safeApprove(address(router1Inch), desc.amount);
+            uint256 token1BalanceBefore = token1.balanceOf(address(this));
+            (returnAmount, spentAmount) = router1Inch.swap(executor, desc, permit, data);
+            uint256 token1BalanceAfter = token1.balanceOf(address(this));
+            
+            if (token1BalanceAfter - token1BalanceBefore < minAmount) {
+                revert InsufficientSwapResult();
+            }
+        }
+        else {
+            minAmount = simulateSwapInputSingle(false, desc.amount);
+
+            // perform actual swap
+            token1.safeApprove(address(router1Inch), desc.amount);
+            uint256 token0BalanceBefore = token0.balanceOf(address(this));
+            (returnAmount, spentAmount) = router1Inch.swap(executor, desc, permit, data);
+            uint256 token0BalanceAfter = token0.balanceOf(address(this));
+            
+            if (token0BalanceAfter - token0BalanceBefore < minAmount) {
+                revert InsufficientSwapResult();
+            }
+        }
+    }
+
+    function simulateSwapInputSingle(bool _zeroForOne, uint256 _amountIn) internal returns (uint256 amountOut) {
+        (bool success, bytes memory returndata) = address(this).delegatecall(
+            abi.encodeWithSignature("simulateSwapInputSingleInternal(bool,uint256)", _zeroForOne, _amountIn));
+        
+        if (success) {
+            // shouldn't happen, revert
+            revert();
+        }
+        else {
+            bytes memory result = bytes(abi.decode(returndata, (string)));
+            if (result.length == 0) {
+                // no result, revert
+                revert();
+            }
+            else {
+                amountOut = abi.decode(result, (uint256));
+            }
+        }
+    }
+
+    function simulateSwapInputSingleInternal(bool _zeroForOne, uint256 _amountIn) external {
+        callbackStatus = 2;
+        (bool success, bytes memory returndata) = address(pool).call(
+            abi.encodeWithSignature(
+                "swap(address,bool,int256,uint160,bytes)",
+                address(this),
+                _zeroForOne,
+                _amountIn.toInt256(),
+                _zeroForOne ? TickMath.MIN_SQRT_RATIO + 1 : TickMath.MAX_SQRT_RATIO - 1,
+                abi.encode(_zeroForOne)
+            )
+        );
+        callbackStatus = 1;
+        
+        if (success) {
+            (int256 amount0, int256 amount1) = abi.decode(returndata, (int256, int256));
+            uint256 amountOut = uint256(-(_zeroForOne ? amount1 : amount0));
+            revert(string(abi.encode(amountOut)));
+        }
+        else {
+            revert("");
+        }
     }
 
     // modifiers
