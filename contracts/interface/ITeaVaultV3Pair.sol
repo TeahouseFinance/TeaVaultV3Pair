@@ -57,6 +57,9 @@ interface ITeaVaultV3Pair {
         uint128 liquidity;
     }
 
+    function assetToken0() external view returns (address);
+    function assetToken1() external view returns (address);
+
     /// @notice Set fee structure and vault addresses
     /// @notice Only available to admins
     /// @param _feeConfig Fee structure settings
@@ -73,27 +76,27 @@ interface ITeaVaultV3Pair {
     function collectManagementFee() external returns (uint256 collectedShares);
 
     /// @notice Mint shares and deposit token0 and token1
-    /// @param _share Share amount to be mint
-    /// @param _maxAmount0 Max token0 amount to be deposited
-    /// @param _maxAmount1 Max token1 amount to be deposited
+    /// @param _shares Share amount to be mint
+    /// @param _amount0Max Max token0 amount to be deposited
+    /// @param _amount1Max Max token1 amount to be deposited
     /// @return depositedAmount0 Deposited token0 amount
     /// @return depositedAmount1 Deposited token1 amount
     function deposit(
-        uint256 _share,
-        uint256 _maxAmount0,
-        uint256 _maxAmount1
+        uint256 _shares,
+        uint256 _amount0Max,
+        uint256 _amount1Max
     ) external returns (uint256 depositedAmount0, uint256 depositedAmount1);
 
     /// @notice Burn shares and withdraw token0 and token1
-    /// @param _share Share amount to be burnt
-    /// @param _minAmount0 Min token0 amount to be withdrawn
-    /// @param _minAmount1 Min token1 amount to be withdrawn
+    /// @param _shares Share amount to be burnt
+    /// @param _amount0Min Min token0 amount to be withdrawn
+    /// @param _amount1Min Min token1 amount to be withdrawn
     /// @return withdrawnAmount0 Withdrew token0 amount
     /// @return withdrawnAmount1 Withdrew token1 amount
     function withdraw(
-        uint256 _share,
-        uint256 _minAmount0,
-        uint256 _minAmount1
+        uint256 _shares,
+        uint256 _amount0Min,
+        uint256 _amount1Min
     ) external returns (uint256 withdrawnAmount0, uint256 withdrawnAmount1);
 
     /// @notice Add liquidity to a position from this vault

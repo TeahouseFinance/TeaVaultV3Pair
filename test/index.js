@@ -92,8 +92,8 @@ describe("TeaVaultV3Pair", function () {
         it("Should set the correct tokens", async function () {
             const { vault, token0, token1 } = await helpers.loadFixture(deployTeaVaultV3Pair);
 
-            expect(await vault.token0()).to.equal(token0.address);
-            expect(await vault.token1()).to.equal(token1.address);
+            expect(await vault.assetToken0()).to.equal(token0.address);
+            expect(await vault.assetToken1()).to.equal(token1.address);
         });
 
         it("Should set the correct decimals", async function () {

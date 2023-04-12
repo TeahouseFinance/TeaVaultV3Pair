@@ -48,8 +48,8 @@ contract TeaVaultV3Pair is
     FeeConfig public feeConfig;
 
     IUniswapV3Pool public pool;
-    ERC20Upgradeable public token0;
-    ERC20Upgradeable public token1;
+    ERC20Upgradeable private token0;
+    ERC20Upgradeable private token1;
 
     uint256 private callbackStatus;
     uint256 public lastCollectManagementFee;
@@ -96,6 +96,14 @@ contract TeaVaultV3Pair is
 
     function decimals() public view override returns (uint8) {
         return DECIMALS;
+    }
+
+    function assetToken0() public view override returns (address) {
+        return address(token0);
+    }
+
+    function assetToken1() public view override returns (address) {
+        return address(token1);
     }
 
     /// @inheritdoc ITeaVaultV3Pair
