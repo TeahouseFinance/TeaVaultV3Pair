@@ -8,7 +8,7 @@ import "@uniswap/v3-periphery/contracts/libraries/LiquidityAmounts.sol";
 import "@uniswap/v3-core/contracts/libraries/FixedPoint96.sol";
 import "@uniswap/v3-core/contracts/libraries/FixedPoint128.sol";
 
-import "./interface/ITeaVaultV3Pair.sol";
+import "../interface/ITeaVaultV3Pair.sol";
 
 library VaultUtils {
 

@@ -20,8 +20,8 @@ import "@uniswap/v3-periphery/contracts/libraries/PoolAddress.sol";
 
 import "./interface/ITeaVaultV3Pair.sol";
 import "./interface/IGenericRouter1Inch.sol";
-import "./VaultUtils.sol";
-import "./GenericRouter1Inch.sol";
+import "./library/VaultUtils.sol";
+import "./library/GenericRouter1Inch.sol";
 
 //import "hardhat/console.sol";
 

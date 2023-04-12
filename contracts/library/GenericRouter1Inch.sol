@@ -5,8 +5,9 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import "./interface/ITeaVaultV3Pair.sol";
-import "./interface/IGenericRouter1Inch.sol";
+
+import "../interface/ITeaVaultV3Pair.sol";
+import "../interface/IGenericRouter1Inch.sol";
 
 library GenericRouter1Inch {
 
