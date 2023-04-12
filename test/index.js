@@ -32,7 +32,6 @@ const testDecimalOffset = loadEnvVarInt(process.env.UNISWAP_TEST_DECIMAL_OFFSET,
 const testToken0Whale = loadEnvVar(process.env.UNISWAP_TEST_TOKEN0_WHALE, "No UNISWAP_TEST_TOKEN0_WHALE");
 const testToken1Whale = loadEnvVar(process.env.UNISWAP_TEST_TOKEN1_WHALE, "No UNISWAP_TEST_TOKEN1_WHALE");
 const test1InchRouter = loadEnvVar(process.env.UNISWAP_TEST_1INCH_ROUTER, "No UNISWAP_TEST_1INCH_ROUTER");
-const test1InchExecutor = loadEnvVar(process.env.UNISWAP_TEST_1INCH_EXECUTOR, "No UNISWAP_TEST_1INCH_EXECUTOR");
 
 const UINT256_MAX = '0x' + 'f'.repeat(64);
 const UINT64_MAX = '0x' + 'f'.repeat(16);
