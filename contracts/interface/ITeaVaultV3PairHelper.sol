@@ -35,11 +35,13 @@ interface ITeaVaultV3PairHelper is IGenericRouter1Inch {
     /// @param _amount1Max Max token1 amount to be deposited
     /// @return depositedAmount0 Deposited token0 amount
     /// @return depositedAmount1 Deposited token1 amount
+    /// @dev this function is set to payable because multicall is payable
+    /// @dev otherwise calls to this function fails as solidity requires msg.value to be 0 for non-payable functions
     function deposit(
         uint256 _shares,
         uint256 _amount0Max,
         uint256 _amount1Max
-    ) external returns (uint256 depositedAmount0, uint256 depositedAmount1);
+    ) external payable returns (uint256 depositedAmount0, uint256 depositedAmount1);
 
     /// @notice Burn shares and withdraw token0 and token1
     /// @notice Can only be called inside multicall
@@ -48,15 +50,19 @@ interface ITeaVaultV3PairHelper is IGenericRouter1Inch {
     /// @param _amount1Min Min token1 amount to be withdrawn
     /// @return withdrawnAmount0 Withdrew token0 amount
     /// @return withdrawnAmount1 Withdrew token1 amount
+    /// @dev this function is set to payable because multicall is payable
+    /// @dev otherwise calls to this function fails as solidity requires msg.value to be 0 for non-payable functions
     function withdraw(
         uint256 _shares,
         uint256 _amount0Min,
         uint256 _amount1Min
-    ) external returns (uint256 withdrawnAmount0, uint256 withdrawnAmount1);
+    ) external payable returns (uint256 withdrawnAmount0, uint256 withdrawnAmount1);
 
     /// @notice Convert all WETH9 back to ETH
     /// @notice Can only be called inside multicall
-    function convertWETH() external;
+    /// @dev this function is set to payable because multicall is payable
+    /// @dev otherwise calls to this function fails as solidity requires msg.value to be 0 for non-payable functions
+    function convertWETH() external payable;
 
     /// @notice Resuce stuck tokens in the contract, send them to the caller
     /// @notice Only owner can call this function.

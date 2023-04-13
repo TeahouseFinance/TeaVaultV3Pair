@@ -8,15 +8,19 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+
 import "./interface/ITeaVaultV3PairHelper.sol";
 import "./interface/IWETH9.sol";
+
+import "hardhat/console.sol";
 
 contract TeaVaultV3PairHelper is ITeaVaultV3PairHelper, Ownable {
 
     using SafeERC20 for IERC20;
 
-    IGenericRouter1Inch immutable router1Inch;
-    IWETH9 immutable weth9;
+    IGenericRouter1Inch immutable public router1Inch;
+    IWETH9 immutable public weth9;
 
     ITeaVaultV3Pair private vault;
     IERC20 private token0;
@@ -25,8 +29,12 @@ contract TeaVaultV3PairHelper is ITeaVaultV3PairHelper, Ownable {
     constructor(address _router1Inch, address _weth9) {
         router1Inch = IGenericRouter1Inch(_router1Inch);
         weth9 = IWETH9(_weth9);
-
+        
         vault = ITeaVaultV3Pair(address(0x1));
+    }
+
+    receive() external payable onlyInMulticall {
+        // allow receiving eth inside multicall
     }
 
     /// @inheritdoc ITeaVaultV3PairHelper
@@ -92,12 +100,12 @@ contract TeaVaultV3PairHelper is ITeaVaultV3PairHelper, Ownable {
         uint256 _shares,
         uint256 _amount0Max,
         uint256 _amount1Max
-    ) external onlyInMulticall returns (uint256 depositedAmount0, uint256 depositedAmount1) {
+    ) external payable onlyInMulticall returns (uint256 depositedAmount0, uint256 depositedAmount1) {
         token0.safeApprove(address(vault), type(uint256).max);
         token1.safeApprove(address(vault), type(uint256).max);
         (depositedAmount0, depositedAmount1) = vault.deposit(_shares, _amount0Max, _amount1Max);
-        token0.safeApprove(address(vault), 1);
-        token1.safeApprove(address(vault), 1);
+        token0.safeApprove(address(vault), 0);
+        token1.safeApprove(address(vault), 0);
 
         IERC20(address(vault)).safeTransfer(msg.sender, _shares);
     }
@@ -107,13 +115,13 @@ contract TeaVaultV3PairHelper is ITeaVaultV3PairHelper, Ownable {
         uint256 _shares,
         uint256 _amount0Min,
         uint256 _amount1Min
-    ) external onlyInMulticall returns (uint256 withdrawnAmount0, uint256 withdrawnAmount1) {
+    ) external payable onlyInMulticall returns (uint256 withdrawnAmount0, uint256 withdrawnAmount1) {
         IERC20(address(vault)).safeTransferFrom(msg.sender, address(this), _shares);
         (withdrawnAmount0, withdrawnAmount1) = vault.withdraw(_shares, _amount0Min, _amount1Min);
     }
 
     /// @inheritdoc ITeaVaultV3PairHelper
-    function convertWETH() external onlyInMulticall {
+    function convertWETH() external payable onlyInMulticall {
         uint256 balance = weth9.balanceOf(address(this));
         weth9.withdraw(balance);
     }
@@ -134,7 +142,8 @@ contract TeaVaultV3PairHelper is ITeaVaultV3PairHelper, Ownable {
             revert InvalidSwapReceiver();
         }
 
-        return router1Inch.swap(executor, desc, permit, data);
+        IERC20(desc.srcToken).safeApprove(address(router1Inch), type(uint256).max);
+        (returnAmount, spentAmount) = router1Inch.swap(executor, desc, permit, data);
     }
 
     /// @inheritdoc IGenericRouter1Inch
@@ -148,7 +157,8 @@ contract TeaVaultV3PairHelper is ITeaVaultV3PairHelper, Ownable {
         bytes32 r,
         bytes32 vs
     ) external payable override onlyInMulticall returns(uint256 returnAmount) {
-        return router1Inch.clipperSwap(clipperExchange, srcToken, dstToken, inputAmount, outputAmount, goodUntil, r, vs);
+        IERC20(srcToken).safeApprove(address(router1Inch), type(uint256).max);
+        returnAmount = router1Inch.clipperSwap(clipperExchange, srcToken, dstToken, inputAmount, outputAmount, goodUntil, r, vs);
     }
 
     /// @inheritdoc IGenericRouter1Inch
@@ -158,7 +168,8 @@ contract TeaVaultV3PairHelper is ITeaVaultV3PairHelper, Ownable {
         uint256 minReturn,
         uint256[] calldata pools
     ) external payable override onlyInMulticall returns(uint256 returnAmount) {
-        return router1Inch.unoswap(srcToken, amount, minReturn, pools);
+        IERC20(srcToken).safeApprove(address(router1Inch), type(uint256).max);
+        returnAmount = router1Inch.unoswap(srcToken, amount, minReturn, pools);
     }
 
     /// @inheritdoc IGenericRouter1Inch
@@ -167,7 +178,13 @@ contract TeaVaultV3PairHelper is ITeaVaultV3PairHelper, Ownable {
         uint256 minReturn,
         uint256[] calldata pools
     ) external payable override onlyInMulticall returns(uint256 returnAmount) {
-        return router1Inch.uniswapV3Swap(amount, minReturn, pools);
+        uint256 poolData = pools[0];
+        bool zeroForOne = poolData & (1 << 255) == 0;
+        IUniswapV3Pool swapPool = IUniswapV3Pool(address(uint160(poolData)));
+        address srcToken = zeroForOne? swapPool.token0(): swapPool.token1();
+
+        IERC20(srcToken).safeApprove(address(router1Inch), type(uint256).max);
+        returnAmount = router1Inch.uniswapV3Swap(amount, minReturn, pools);
     }
 
     // modifiers
