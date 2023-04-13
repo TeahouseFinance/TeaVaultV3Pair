@@ -820,6 +820,59 @@ describe("TeaVaultV3PairHelper", function () {
             
             // should have shares minted
             expect(await vault.balanceOf(user.address)).to.equal(ethers.BigNumber.from(shares).add(shares2));
-        });        
+        });
+
+        it("Should be able to withdraw and swap", async function() {
+            const { owner, manager, user, helper, vault, token0, token1 } = await helpers.loadFixture(deployTeaVaultV3PairHelper);
+
+            // set fees
+            const feeConfig = {
+                vault: owner.address,
+                entryFee: 1000,
+                exitFee: 2000,
+                performanceFee: 100000,
+                managementFee: 0,
+            }
+
+            await vault.setFeeConfig(feeConfig);
+
+            // set manager
+            await vault.assignManager(manager.address);
+
+            // deposit
+            await token0.connect(user).approve(vault.address, "10000" + "0".repeat(await token0.decimals()));
+            await token1.connect(user).approve(vault.address, "10000" + "0".repeat(await token1.decimals()));
+            const shares = "100" + "0".repeat(await vault.decimals());
+            await vault.connect(user).deposit(shares, UINT256_MAX, UINT256_MAX);
+
+            // swap
+            await vault.connect(manager).swapInputSingle(
+                true,
+                "50" + "0".repeat(await token0.decimals()),
+                0,
+                0,
+                UINT64_MAX
+            );
+
+            // estimate vault value in token0
+            const valueInToken0 = await vault.estimatedValueInToken0();
+
+            // withdraw and swap using helper
+            const token0Before = await token0.balanceOf(user.address);
+            const swapData = "0x0502b1c5000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2000000000000000000000000000000000000000000000000005c6ed7b17288880000000000000000000000000000000000000000000000000000000002eba0e90000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000000180000000000000003b6d0340b4e16d0168e52d35cacd2c6185b44281ec28c9dccfee7c08";
+            const withdrawData = helper.interface.encodeFunctionData("withdraw", [ shares, 0, 0 ]);
+            await vault.connect(user).approve(helper.address, shares);
+            await helper.connect(user).multicall(
+                vault.address,
+                0,
+                0,
+                [ withdrawData, swapData ]
+            );
+            const token0After = await token0.balanceOf(user.address);
+
+            expect(await vault.balanceOf(user.address)).to.equal(0);
+            // received token0 should be > 95% of estimated vault value in token0
+            expect(token0After.sub(token0Before).gt(valueInToken0.mul(95).div(100))).to.be.true;
+        });
     });
 });
