@@ -78,7 +78,7 @@ contract TeaVaultV3PairHelper is ITeaVaultV3PairHelper, Ownable {
         }
 
         // refund all balances
-        if (address(this).balance != 0) {
+        if (address(this).balance > 0) {
             Address.sendValue(payable(msg.sender), address(this).balance);
         }
 
@@ -104,9 +104,12 @@ contract TeaVaultV3PairHelper is ITeaVaultV3PairHelper, Ownable {
         token0.safeApprove(address(vault), type(uint256).max);
         token1.safeApprove(address(vault), type(uint256).max);
         (depositedAmount0, depositedAmount1) = vault.deposit(_shares, _amount0Max, _amount1Max);
+
+        // since vault is specified by the caller, it's safer to remove all allowances after depositing
         token0.safeApprove(address(vault), 0);
         token1.safeApprove(address(vault), 0);
 
+        // send the resulting shares to the caller
         IERC20(address(vault)).safeTransfer(msg.sender, _shares);
     }
 
