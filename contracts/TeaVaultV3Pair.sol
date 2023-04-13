@@ -26,12 +26,12 @@ import "./library/GenericRouter1Inch.sol";
 //import "hardhat/console.sol";
 
 contract TeaVaultV3Pair is
+    ITeaVaultV3Pair,
     Initializable,
     UUPSUpgradeable,
     OwnableUpgradeable,
     ReentrancyGuardUpgradeable,
-    ERC20Upgradeable,
-    ITeaVaultV3Pair
+    ERC20Upgradeable
 {
     using SafeERC20Upgradeable for ERC20Upgradeable;
     using FullMath for uint256;

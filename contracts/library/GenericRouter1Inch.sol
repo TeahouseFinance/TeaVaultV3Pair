@@ -44,7 +44,7 @@ library GenericRouter1Inch {
             uint256 token1BalanceAfter = token1.balanceOf(address(this));
             uint256 convertedAmount = token1BalanceAfter - token1BalanceBefore;
             if (convertedAmount < minAmount) {
-                revert InsufficientSwapResult(minAmount, convertedAmount);
+                revert ITeaVaultV3Pair.InsufficientSwapResult(minAmount, convertedAmount);
             }
         }
         else {
@@ -55,7 +55,7 @@ library GenericRouter1Inch {
             uint256 token0BalanceAfter = token0.balanceOf(address(this));
             uint256 convertedAmount = token0BalanceAfter - token0BalanceBefore;
             if (convertedAmount < minAmount) {
-                revert InsufficientSwapResult(minAmount, convertedAmount);
+                revert ITeaVaultV3Pair.InsufficientSwapResult(minAmount, convertedAmount);
             }
         }
     }
@@ -85,7 +85,7 @@ library GenericRouter1Inch {
             uint256 token1BalanceAfter = token1.balanceOf(address(this));
             uint256 convertedAmount = token1BalanceAfter - token1BalanceBefore;
             if (convertedAmount < minAmount) {
-                revert InsufficientSwapResult(minAmount, convertedAmount);
+                revert ITeaVaultV3Pair.InsufficientSwapResult(minAmount, convertedAmount);
             }
         }
         else {
@@ -96,7 +96,7 @@ library GenericRouter1Inch {
             uint256 token0BalanceAfter = token0.balanceOf(address(this));
             uint256 convertedAmount = token0BalanceAfter - token0BalanceBefore;
             if (convertedAmount < minAmount) {
-                revert InsufficientSwapResult(minAmount, convertedAmount);
+                revert ITeaVaultV3Pair.InsufficientSwapResult(minAmount, convertedAmount);
             }
         }
     }
@@ -124,7 +124,7 @@ library GenericRouter1Inch {
             uint256 token1BalanceAfter = token1.balanceOf(address(this));
             uint256 convertedAmount = token1BalanceAfter - token1BalanceBefore;
             if (convertedAmount < minAmount) {
-                revert InsufficientSwapResult(minAmount, convertedAmount);
+                revert ITeaVaultV3Pair.InsufficientSwapResult(minAmount, convertedAmount);
             }
         }
         else {
@@ -135,7 +135,7 @@ library GenericRouter1Inch {
             uint256 token0BalanceAfter = token0.balanceOf(address(this));
             uint256 convertedAmount = token0BalanceAfter - token0BalanceBefore;
             if (convertedAmount < minAmount) {
-                revert InsufficientSwapResult(minAmount, convertedAmount);
+                revert ITeaVaultV3Pair.InsufficientSwapResult(minAmount, convertedAmount);
             }
         }
     }
@@ -162,7 +162,7 @@ library GenericRouter1Inch {
             uint256 token1BalanceAfter = token1.balanceOf(address(this));
             uint256 convertedAmount = token1BalanceAfter - token1BalanceBefore;
             if (convertedAmount < minAmount) {
-                revert InsufficientSwapResult(minAmount, convertedAmount);
+                revert ITeaVaultV3Pair.InsufficientSwapResult(minAmount, convertedAmount);
             }
         }
         else {
@@ -173,7 +173,7 @@ library GenericRouter1Inch {
             uint256 token0BalanceAfter = token0.balanceOf(address(this));
             uint256 convertedAmount = token0BalanceAfter - token0BalanceBefore;
             if (convertedAmount < minAmount) {
-                revert InsufficientSwapResult(minAmount, convertedAmount);
+                revert ITeaVaultV3Pair.InsufficientSwapResult(minAmount, convertedAmount);
             }
         }
     }
