@@ -74,7 +74,8 @@ contract TeaVaultV3PairHelper is ITeaVaultV3PairHelper, Ownable {
         // execute commands
         results = new bytes[](_data.length);
         for (uint256 i = 0; i < _data.length; i++) {
-            results[i] = Address.functionDelegateCall(address(this), _data[i]);
+            (bool success, bytes memory returndata) = address(this).delegatecall(_data[i]);
+            results[i] = Address.verifyCallResult(success, returndata, "Address: low-level delegate call failed");
         }
 
         // refund all balances
