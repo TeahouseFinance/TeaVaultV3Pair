@@ -106,6 +106,14 @@ contract TeaVaultV3Pair is
         return address(token1);
     }
 
+    function getToken0Balance() external override view returns (uint256) {
+        return token0.balanceOf(address(this));
+    }
+
+    function getToken1Balance() external override view returns (uint256) {
+        return token1.balanceOf(address(this));
+    }
+
     /// @inheritdoc ITeaVaultV3Pair
     function setFeeConfig(FeeConfig calldata _feeConfig) external override onlyOwner {
         if (_feeConfig.entryFee + _feeConfig.exitFee > FEE_MULTIPLIER) revert InvalidFeePercentage();

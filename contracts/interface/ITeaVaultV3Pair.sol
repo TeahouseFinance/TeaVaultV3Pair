@@ -57,8 +57,21 @@ interface ITeaVaultV3Pair {
         uint128 liquidity;
     }
 
-    function assetToken0() external view returns (address);
-    function assetToken1() external view returns (address);
+    /// @notice get asset token0 address
+    /// @return token0 token0 address
+    function assetToken0() external view returns (address token0);
+
+    /// @notice get asset token1 address
+    /// @return token1 token1 address
+    function assetToken1() external view returns (address token1);
+
+    /// @notice get vault balance of token0
+    /// @return amount vault balance of token0
+    function getToken0Balance() external view returns (uint256 amount);
+
+    /// @notice get vault balance of token0
+    /// @return amount vault balance of token0
+    function getToken1Balance() external view returns (uint256 amount);
 
     /// @notice Set fee structure and vault addresses
     /// @notice Only available to admins
