@@ -73,6 +73,22 @@ interface ITeaVaultV3Pair {
     /// @return amount vault balance of token0
     function getToken1Balance() external view returns (uint256 amount);
 
+    /// @notice get pool status and pool token info
+    /// @return sqrtPriceX96 current pool price in sqrtPriceX96
+    /// @return tick current pool price in tick
+    /// @return token0 token0 address
+    /// @return token1 token1 address
+    /// @return decimals0 token0 decimals
+    /// @return decimals1 token1 decimals
+    function getPoolStatus() external view returns (
+        uint160 sqrtPriceX96,
+        int24 tick,
+        address token0,
+        address token1,
+        uint8 decimals0,
+        uint8 decimals1
+    );
+
     /// @notice Set fee structure and vault addresses
     /// @notice Only available to admins
     /// @param _feeConfig Fee structure settings
