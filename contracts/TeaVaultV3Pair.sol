@@ -580,7 +580,7 @@ contract TeaVaultV3Pair is
                 ? (zeroForOne, uint256(_amount0Delta))
                 : (!zeroForOne, uint256(_amount1Delta));
 
-        if (isExactInput) {
+        if (isExactInput == zeroForOne) {
             token0.safeTransfer(msg.sender, amountToPay);
         }
         else {
