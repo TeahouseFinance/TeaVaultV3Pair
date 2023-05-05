@@ -114,12 +114,13 @@ contract TeaVaultV3Pair is
         return token1.balanceOf(address(this));
     }
 
-    function getPoolStatus() external override view returns (uint160, int24, address, address, uint8, uint8) {
-        (uint160 sqrtPriceX96, int24 tick, , , , , ) = pool.slot0();
+    function getPoolInfo() external view returns (address, address, uint8, uint8, uint24, uint160, int24) {
+        uint24 feeTier = pool.fee();
         uint8 decimals0 = token0.decimals();
         uint8 decimals1 = token1.decimals();
+        (uint160 sqrtPriceX96, int24 tick, , , , , ) = pool.slot0();
 
-        return (sqrtPriceX96, tick, address(token0), address(token1), decimals0, decimals1);
+        return (address(token0), address(token1), decimals0, decimals1, feeTier, sqrtPriceX96, tick);
     }
 
     /// @inheritdoc ITeaVaultV3Pair
