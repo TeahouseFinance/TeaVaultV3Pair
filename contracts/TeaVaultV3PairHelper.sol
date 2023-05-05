@@ -23,8 +23,6 @@ contract TeaVaultV3PairHelper is ITeaVaultV3PairHelper, Ownable {
     IWETH9 immutable public weth9;
 
     ITeaVaultV3Pair private vault;
-    IERC20 private token0;
-    IERC20 private token1;
 
     constructor(address _router1Inch, address _weth9) {
         router1Inch = IGenericRouter1Inch(_router1Inch);
@@ -49,8 +47,8 @@ contract TeaVaultV3PairHelper is ITeaVaultV3PairHelper, Ownable {
         }
 
         vault = _vault;
-        token0 = IERC20(_vault.assetToken0());
-        token1 = IERC20(_vault.assetToken1());
+        IERC20 token0 = IERC20(_vault.assetToken0());
+        IERC20 token1 = IERC20(_vault.assetToken1());
 
         // convert msg.value into weth9 if necessary
         if (msg.value > 0) {
@@ -96,12 +94,15 @@ contract TeaVaultV3PairHelper is ITeaVaultV3PairHelper, Ownable {
         vault = ITeaVaultV3Pair(address(0x1));
     }
 
+
     /// @inheritdoc ITeaVaultV3PairHelper
     function deposit(
         uint256 _shares,
         uint256 _amount0Max,
         uint256 _amount1Max
     ) external payable onlyInMulticall returns (uint256 depositedAmount0, uint256 depositedAmount1) {
+        IERC20 token0 = IERC20(vault.assetToken0());
+        IERC20 token1 = IERC20(vault.assetToken1());        
         token0.safeApprove(address(vault), type(uint256).max);
         token1.safeApprove(address(vault), type(uint256).max);
         (depositedAmount0, depositedAmount1) = vault.deposit(_shares, _amount0Max, _amount1Max);
