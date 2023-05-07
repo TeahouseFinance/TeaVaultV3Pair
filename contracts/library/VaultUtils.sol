@@ -72,7 +72,7 @@ library VaultUtils {
             liquidity
         );
         
-        fee0 = tokensOwed0 + _potisionSwapFee(
+        fee0 = tokensOwed0 + potisionSwapFee(
             tick,
             position.tickLower,
             position.tickUpper,
@@ -83,7 +83,7 @@ library VaultUtils {
             feeGrowthOutside0X128Upper
         );
 
-        fee1 = tokensOwed1 + _potisionSwapFee(
+        fee1 = tokensOwed1 + potisionSwapFee(
             tick,
             position.tickLower,
             position.tickUpper,
@@ -95,7 +95,7 @@ library VaultUtils {
         );
     }
 
-    function _potisionSwapFee(
+    function potisionSwapFee(
         int24 _tick,
         int24 _tickLower,
         int24 _tickUpper,
