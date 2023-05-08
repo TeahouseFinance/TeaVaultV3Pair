@@ -4,7 +4,7 @@ TeaVault v3 pair (hereinafter simplified as TeaVault) is an infrastructure desig
 
 ## Design
 
-![](https://i.imgur.com/naSV2Zq.png)
+![](.imgs/fig.png)
 
 ### Roles
 
