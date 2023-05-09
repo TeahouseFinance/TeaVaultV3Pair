@@ -1,7 +1,6 @@
 const helpers = require("@nomicfoundation/hardhat-network-helpers");
 const { expect } = require("chai");
-const { providers } = require("ethers");
-const { network, ethers, upgrades } = require("hardhat");
+const { ethers, upgrades } = require("hardhat");
 
 
 function loadEnvVar(env, errorMsg) {
@@ -503,7 +502,7 @@ describe("TeaVaultV3PairHelper", function () {
         });
 
         it("Should not be able to rescue funds from non-owner", async function () {
-            const { helper, token0, owner, user } = await helpers.loadFixture(deployTeaVaultV3PairHelper);
+            const { helper, token0, user } = await helpers.loadFixture(deployTeaVaultV3PairHelper);
 
             const amount = "1000" + "0".repeat(await token0.decimals());
             await token0.connect(user).transfer(helper.address, amount);
