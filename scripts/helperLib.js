@@ -12,7 +12,9 @@ module.exports = {
     is1InchHealthy,
     getQuoteFrom1Inch,
     previewDeposit,
-    deposit
+    deposit,
+    previewWithdraw,
+    withdraw
 };
 
 const FQDN_1INCH = 'https://api.1inch.io/'
@@ -55,6 +57,13 @@ async function getQuoteFrom1Inch(chainId, fromToken, toToken, amount) {
     }
 }
 
+// get swap from 1inch
+// chainId: chainId
+// fromToken: address of source token
+// toToken: address of target token
+// amount: amount of source token
+// fromAddress: address of source token holder
+// slippage: slippage (1 ~ 50)
 async function getSwapFrom1Inch(chainId, fromToken, toToken, amount, fromAddress, slippage) {
     if (chainId == HARDHAT_NETWORK_CHAINID) chainId = OVERRIDE_CHAINID;
     const response = await fetch(FQDN_1INCH + 'v5.0/' + chainId + '/swap?'
@@ -210,7 +219,7 @@ async function previewDeposit(helper, vault, amount0, amount1, eth = undefined) 
 // vault: a TeaVaultV3Pair contract object created using ethers.js
 // preview: a preview object returned by previewDeposit function
 // slppage: allowed slippage for 1Inch exchange swap
-// unwrapWeth: also unwrap WETH to ETH
+// unwrapWeth: true to unwrap WETH to ETH
 // amount0max: maximum amount of token0 to deposit
 // amount1max: maximum amount of token1 to deposit
 // returns: multicall data for calling the multicall function
@@ -261,5 +270,107 @@ async function deposit(helper, vault, preview, slippage, unwrapWeth = true, amou
         }    
     }
     
+    return result;
+}
+
+// preview withdraw
+// helper: a TeaVaultV3PairHelper contract object created using ethers.js
+// vault: a TeaVaultV3Pair contract object created using ethers.js
+// shares: amount of shares to withdraw
+// returns:
+// amount0: estimated amount of token0 to be withdrawn
+// amount1: estimated amount of token1 to be withdrawm
+// convertToToken0: estimated total amount of token0 if convert all token1 into token0
+// convertToToken1: estimated total amount of token1 if convert all token0 into token1
+async function previewWithdraw(helper, vault, shares) {
+    const network = await vault.provider.getNetwork();
+    const healthy = await is1InchHealthy(network.chainId);
+    if (!healthy) {
+        throw new Error("1Inch network not healthy");
+    }
+
+    const token0 = await vault.assetToken0();
+    const token1 = await vault.assetToken1();
+
+    const amounts = await vault.callStatic.withdraw(shares, 0, 0);
+
+    // estimate convertToToken0 by converting all token1 to token0
+    const quote0 = await getQuoteFrom1Inch(network.chainId, token1, token0, amounts.withdrawnAmount1);
+    const convertToToken0 = amounts.withdrawnAmount0.add(quote0.toTokenAmount);
+
+    // estimate convertToToken0 by converting all token1 to token0
+    const quote1 = await getQuoteFrom1Inch(network.chainId, token0, token1, amounts.withdrawnAmount0);
+    const convertToToken1 = amounts.withdrawnAmount1.add(quote1.toTokenAmount);
+
+    return {
+        amount0: amounts.withdrawnAmount0,
+        amount1: amounts.withdrawnAmount1,
+        convertToToken0: convertToToken0,
+        convertToToken1: convertToToken1
+    };
+}
+
+// perform withdraw
+// helper: a TeaVaultV3PairHelper contract object created using ethers.js
+// vault: a TeaVaultV3Pair contract object created using ethers.js
+// shares: amount of shares to withdraw
+// target: 0: do not convert, 1: convert to token0, 2: convert to token1
+// slippage: slippage
+// unwrapWeth: true to unwrap WETH to ETH
+// amount0min: minimum amount of token0 to withdraw
+// amount1min: minimum amount of token1 to withdraw
+// returns: multicall data for calling the multicall function
+async function withdraw(helper, vault, shares, target, slippage, unwrapWeth = true, amount0min = 0, amount1min = 0) {
+    const network = await vault.provider.getNetwork();
+    const healthy = await is1InchHealthy(network.chainId);
+    if (!healthy) {
+        throw new Error("1Inch network not healthy");
+    }
+
+    let result = [];
+
+    const token0 = await vault.assetToken0();
+    const token1 = await vault.assetToken1();
+
+    const amounts = await vault.callStatic.withdraw(shares, 0, 0);
+
+    result.push(helper.interface.encodeFunctionData('withdraw', [ shares, amount0min, amount1min ]));
+
+    if (target == 0) {
+        // do nothing
+    }
+    else if (target == 1) {
+        const amountsMinusSlippage = amounts.withdrawnAmount1.mul(1000 - slippage).div(1000);
+
+        const swap = await getSwapFrom1Inch(network.chainId, token1, token0, amountsMinusSlippage, helper.address, slippage);
+        const router1Inch = await helper.router1Inch();
+        if (router1Inch.toLowerCase() != swap.tx.to.toLowerCase()) {
+            throw new Error("1Inch router mismatch");
+        }
+
+        result.push(swap.tx.data);
+    }
+    else if (target == 2) {
+        const amountsMinusSlippage = amounts.withdrawnAmount0.mul(1000 - slippage).div(1000);
+
+        const swap = await getSwapFrom1Inch(network.chainId, token0, token1, amountsMinusSlippage, helper.address, slippage);
+        const router1Inch = await helper.router1Inch();
+        if (router1Inch.toLowerCase() != swap.tx.to.toLowerCase()) {
+            throw new Error("1Inch router mismatch");
+        }
+
+        result.push(swap.tx.data);
+    }
+    else {
+        throw new Error("Invalid target");
+    }
+
+    if (unwrapWeth) {
+        const weth9 = await helper.weth9();
+        if (weth9 == token0 || weth9 == token1) {
+            result.push(helper.interface.encodeFunctionData('convertWETH'));
+        }
+    }
+
     return result;
 }
