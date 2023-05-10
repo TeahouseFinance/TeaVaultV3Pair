@@ -147,7 +147,10 @@ contract TeaVaultV3PairHelper is ITeaVaultV3PairHelper, Ownable {
             revert InvalidSwapReceiver();
         }
 
-        IERC20(desc.srcToken).safeApprove(address(router1Inch), type(uint256).max);
+        IERC20 srcToken = IERC20(desc.srcToken);
+        if (srcToken.allowance(address(this), address(router1Inch)) < desc.amount) {
+            srcToken.approve(address(router1Inch), type(uint256).max);
+        }
         (returnAmount, spentAmount) = router1Inch.swap(executor, desc, permit, data);
     }
 
@@ -162,7 +165,10 @@ contract TeaVaultV3PairHelper is ITeaVaultV3PairHelper, Ownable {
         bytes32 r,
         bytes32 vs
     ) external payable override onlyInMulticall returns(uint256 returnAmount) {
-        IERC20(srcToken).safeApprove(address(router1Inch), type(uint256).max);
+        IERC20 token = IERC20(srcToken);
+        if (token.allowance(address(this), address(router1Inch)) < inputAmount) {
+            token.approve(address(router1Inch), type(uint256).max);
+        }
         returnAmount = router1Inch.clipperSwap(clipperExchange, srcToken, dstToken, inputAmount, outputAmount, goodUntil, r, vs);
     }
 
@@ -173,7 +179,10 @@ contract TeaVaultV3PairHelper is ITeaVaultV3PairHelper, Ownable {
         uint256 minReturn,
         uint256[] calldata pools
     ) external payable override onlyInMulticall returns(uint256 returnAmount) {
-        IERC20(srcToken).safeApprove(address(router1Inch), type(uint256).max);
+        IERC20 token = IERC20(srcToken);
+        if (token.allowance(address(this), address(router1Inch)) < amount) {
+            token.approve(address(router1Inch), type(uint256).max);
+        }
         returnAmount = router1Inch.unoswap(srcToken, amount, minReturn, pools);
     }
 
@@ -188,7 +197,10 @@ contract TeaVaultV3PairHelper is ITeaVaultV3PairHelper, Ownable {
         IUniswapV3Pool swapPool = IUniswapV3Pool(address(uint160(poolData)));
         address srcToken = zeroForOne? swapPool.token0(): swapPool.token1();
 
-        IERC20(srcToken).safeApprove(address(router1Inch), type(uint256).max);
+        IERC20 token = IERC20(srcToken);
+        if (token.allowance(address(this), address(router1Inch)) < amount) {
+            token.approve(address(router1Inch), type(uint256).max);
+        }
         returnAmount = router1Inch.uniswapV3Swap(amount, minReturn, pools);
     }
 
