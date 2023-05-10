@@ -210,10 +210,11 @@ async function previewDeposit(helper, vault, amount0, amount1, eth = undefined) 
 // vault: a TeaVaultV3Pair contract object created using ethers.js
 // preview: a preview object returned by previewDeposit function
 // slppage: allowed slippage for 1Inch exchange swap
+// unwrapWeth: also unwrap WETH to ETH
 // amount0max: maximum amount of token0 to deposit
 // amount1max: maximum amount of token1 to deposit
 // returns: multicall data for calling the multicall function
-async function deposit(helper, vault, preview, slippage, amount0max = undefined, amount1max = undefined) {
+async function deposit(helper, vault, preview, slippage, unwrapWeth = true, amount0max = undefined, amount1max = undefined) {
     const network = await vault.provider.getNetwork();
     const healthy = await is1InchHealthy(network.chainId);
     if (!healthy) {
@@ -253,10 +254,12 @@ async function deposit(helper, vault, preview, slippage, amount0max = undefined,
     result.push(helper.interface.encodeFunctionData('deposit', [ sharesMinusSlippage, amount0max, amount1max ]));
 
     // convert weth9 back to eth if either token0 or token1 is weth9
-    const weth9 = await helper.weth9();
-    if (weth9 == token0 || weth9 == token1) {
-        result.push(helper.interface.encodeFunctionData('convertWETH'));
+    if (unwrapWeth) {
+        const weth9 = await helper.weth9();
+        if (weth9 == token0 || weth9 == token1) {
+            result.push(helper.interface.encodeFunctionData('convertWETH'));
+        }    
     }
-
+    
     return result;
 }
