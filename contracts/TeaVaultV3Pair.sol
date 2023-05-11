@@ -318,7 +318,7 @@ contract TeaVaultV3Pair is
         token0.safeTransfer(msg.sender, withdrawnAmount0);
         token1.safeTransfer(msg.sender, withdrawnAmount1);
 
-        emit withdrawShares(msg.sender, _shares, withdrawnAmount0, withdrawnAmount1, exitFeeAmount);
+        emit WithdrawShares(msg.sender, _shares, withdrawnAmount0, withdrawnAmount1, exitFeeAmount);
     }
 
     /// @inheritdoc ITeaVaultV3Pair
