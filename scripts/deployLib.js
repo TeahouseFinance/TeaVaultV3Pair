@@ -26,6 +26,8 @@ const token1 = loadEnvVar(process.env.UNISWAP_TEST_TOKEN1, "No UNISWAP_TEST_TOKE
 const feeTier = loadEnvVarInt(process.env.UNISWAP_TEST_FEE_TIER, "No UNISWAP_TEST_FEE_TIER");
 const decimalOffset = loadEnvVarInt(process.env.UNISWAP_TEST_DECIMAL_OFFSET, "No UNISWAP_TEST_DECIMAL_OFFSET");
 const owner = loadEnvVar(process.env.OWNER, "No OWNER");
+const vaultUtils = loadEnvVar(process.env.VAULTUTILS, "No VAULTUTILS");
+const genericRouter1Inch = loadEnvVar(process.env.GENERICROUTER1INCH, "No GENERICROUTER1INCH");
 
 const feeVault = loadEnvVar(process.env.FEE_VAULT, "No FEE_VAULT");
 const entryFee = loadEnvVarInt(process.env.ENTRY_FEE, "No ENTRY_FEE");
@@ -36,36 +38,28 @@ const oneInchRouter = loadEnvVar(process.env.ROUTER_1INCH_V5, "No ROUTER_1INCH_V
 const manager = loadEnvVar(process.env.MANAGER, "No MANAGER");
 
 async function main() {
-    // const [deployer] = await ethers.getSigners();
-
-    // deploy TeaVaultV3Pair
-    const VaultUtils = await ethers.getContractFactory("VaultUtils");
-    const vaultUtils = await VaultUtils.deploy();
-
-    const GenericRouter1Inch = await ethers.getContractFactory("GenericRouter1Inch");
-    const genericRouter1Inch = await GenericRouter1Inch.deploy();
-
+    const [deployer] = await ethers.getSigners();
     const TeaVaultV3Pair = await ethers.getContractFactory("TeaVaultV3Pair", {
         libraries: {
-            VaultUtils: vaultUtils.address,
-            GenericRouter1Inch: genericRouter1Inch.address,
+            VaultUtils: vaultUtils,
+            GenericRouter1Inch: genericRouter1Inch,
         },
     });
 
     const vault = await upgrades.deployProxy(
         TeaVaultV3Pair,
-        [name, symbol, factory, token0, token1, feeTier, decimalOffset, owner],
+        [name, symbol, factory, token0, token1, feeTier, decimalOffset, deployer.address],
         {
             kind: "uups",
             unsafeAllowLinkedLibraries: true,
             unsafeAllow: ["delegatecall"],
         }
     );
-    console.log("VaultUtils deployed", vaultUtils.address);
-    console.log("GenericRouter1Inch deployed", genericRouter1Inch.address);
+
+    console.log("VaultUtils used", vaultUtils);
+    console.log("GenericRouter1Inch used", genericRouter1Inch);
     console.log("Vault depolyed", vault.address);
 
-    console.log("Vault depolyed", vault.address);
     await vault.setFeeConfig([feeVault, entryFee, exitFee, performanceFee, managementFee]);
     await vault.assignManager(manager);
     await vault.assignRouter1Inch(oneInchRouter);
