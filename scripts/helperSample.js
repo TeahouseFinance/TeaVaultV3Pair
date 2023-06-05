@@ -141,7 +141,7 @@ async function main() {
     let token1Before = await token1.balanceOf(user.address);
     await token0.connect(user).approve(helper.address, ethers.utils.parseUnits("10000", await token0.decimals()));
     await token1.connect(user).approve(helper.address, ethers.utils.parseUnits("10000", await token1.decimals()));
-    await helper.connect(user).multicall(vault.address, amount0, amount1, multicallData, { value: 0 });
+    await helper.connect(user).multicall(vault.address, amount0, 0, multicallData, { value: amount1 });
     let sharesAfter = await vault.balanceOf(user.address);
     let token0After = await token0.balanceOf(user.address);
     let token1After = await token1.balanceOf(user.address);
