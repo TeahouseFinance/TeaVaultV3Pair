@@ -57,6 +57,10 @@ contract TeaVaultV3Pair is
 
     IGenericRouter1Inch public router1Inch;
 
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(
         string calldata _name,
         string calldata _symbol,
