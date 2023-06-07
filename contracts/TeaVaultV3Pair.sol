@@ -82,6 +82,8 @@ contract TeaVaultV3Pair is
 
         IUniswapV3Factory factory = IUniswapV3Factory(_factory);
         pool = IUniswapV3Pool(factory.getPool(_token0, _token1, _feeTier));
+        if (address(pool) == address(0)) revert PoolNotInitialized();
+
         token0 = ERC20Upgradeable(_token0);
         token1 = ERC20Upgradeable(_token1);
         DECIMALS = _decimalOffset + token0.decimals();
