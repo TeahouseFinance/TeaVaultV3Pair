@@ -70,8 +70,8 @@ interface ITeaVaultV3Pair {
     /// @return amount vault balance of token0
     function getToken0Balance() external view returns (uint256 amount);
 
-    /// @notice get vault balance of token0
-    /// @return amount vault balance of token0
+    /// @notice get vault balance of token1
+    /// @return amount vault balance of token1
     function getToken1Balance() external view returns (uint256 amount);
 
     /// @notice get pool token and price info
