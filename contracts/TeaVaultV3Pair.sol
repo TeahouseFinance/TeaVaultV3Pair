@@ -39,6 +39,7 @@ contract TeaVaultV3Pair is
 
     uint256 public SECONDS_IN_A_YEAR;
     uint256 public DECIMALS_MULTIPLIER;
+    uint256 public FEE_CAP;
     uint256 public FEE_MULTIPLIER;
     uint8 internal DECIMALS;
     uint8 internal MAX_POSITION_LENGTH;
@@ -64,6 +65,7 @@ contract TeaVaultV3Pair is
         address _token1,
         uint24 _feeTier,
         uint8 _decimalOffset,
+        uint24 _feeCap,
         FeeConfig calldata _feeConfig,
         address _owner
     ) public initializer {
@@ -90,6 +92,7 @@ contract TeaVaultV3Pair is
         DECIMALS = _decimalOffset + token0.decimals();
 
         callbackStatus = 1;
+        FEE_CAP = _feeCap;
         _setFeeConfig(_feeConfig);
         transferOwnership(_owner);
 
@@ -133,9 +136,9 @@ contract TeaVaultV3Pair is
     }
 
     function _setFeeConfig(FeeConfig calldata _feeConfig) internal {
-        if (_feeConfig.entryFee + _feeConfig.exitFee > FEE_MULTIPLIER) revert InvalidFeePercentage();
-        if (_feeConfig.performanceFee > FEE_MULTIPLIER) revert InvalidFeePercentage();
-        if (_feeConfig.managementFee > FEE_MULTIPLIER) revert InvalidFeePercentage();
+        if (_feeConfig.entryFee + _feeConfig.exitFee > FEE_CAP) revert InvalidFeePercentage();
+        if (_feeConfig.performanceFee > FEE_CAP) revert InvalidFeePercentage();
+        if (_feeConfig.managementFee > FEE_CAP) revert InvalidFeePercentage();
 
         feeConfig = _feeConfig;
 
