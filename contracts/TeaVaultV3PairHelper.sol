@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Teahouse Finance
 
-pragma solidity ^0.8.0;
+pragma solidity =0.8.19;
 
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";

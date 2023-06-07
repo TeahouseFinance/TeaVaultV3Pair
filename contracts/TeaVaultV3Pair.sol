@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Teahouse Finance
 
-pragma solidity ^0.8.0;
+pragma solidity =0.8.19;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
@@ -57,8 +57,9 @@ contract TeaVaultV3Pair is
 
     IGenericRouter1Inch public router1Inch;
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
-        _disableInitializers();
+        _disableInitializers(); // prevent attack from using implementation contracts (audit ID:4)
     }
 
     function initialize(
@@ -89,15 +90,19 @@ contract TeaVaultV3Pair is
 
         IUniswapV3Factory factory = IUniswapV3Factory(_factory);
         pool = IUniswapV3Pool(factory.getPool(_token0, _token1, _feeTier));
-        if (address(pool) == address(0)) revert PoolNotInitialized();
+        if (address(pool) == address(0)) revert PoolNotInitialized(); // Make sure the pool exists (audit ID:1)
 
         token0 = ERC20Upgradeable(_token0);
         token1 = ERC20Upgradeable(_token1);
         DECIMALS = _decimalOffset + token0.decimals();
 
         callbackStatus = 1;
-        FEE_CAP = _feeCap;
-        _setFeeConfig(_feeConfig);
+
+        // set a hardcap on fee configuration (audit ID:3)
+        if (_feeCap >= FEE_MULTIPLIER) revert InvalidFeeCap();
+        FEE_CAP = _feeCap; 
+        
+        _setFeeConfig(_feeConfig); // set initial fee config (audit ID:2)
         transferOwnership(_owner);
 
         emit TeaVaultV3PairCreated(address(this));
@@ -348,7 +353,7 @@ contract TeaVaultV3Pair is
         uint256 positionLength = positions.length;
         uint256 i;
 
-        for (i = 0; i < positionLength; i++) {
+        for (; i < positionLength; i++) {
             Position storage position = positions[i];
             if (position.tickLower == _tickLower && position.tickUpper == _tickUpper) {
                 (amount0, amount1) = _addLiquidity(_tickLower, _tickUpper, _liquidity, _amount0Min, _amount1Min);

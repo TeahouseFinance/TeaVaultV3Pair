@@ -74,8 +74,16 @@ async function deployTeaVaultV3Pair() {
         },
     });
 
+    const feeCap = 999999;
+    const feeConfig = {
+        vault: owner.address,
+        entryFee: 0,
+        exitFee: 0,
+        performanceFee: 0,
+        managementFee: 0,
+    };
     const vault = await upgrades.deployProxy(TeaVaultV3Pair,
-        [ "Test Vault", "TVault", testFactory, token0.address, token1.address, testFeeTier, testDecimalOffset, owner.address, ],
+        [ "Test Vault", "TVault", testFactory, token0.address, token1.address, testFeeTier, testDecimalOffset, feeCap, feeConfig, owner.address, ],
         { 
             kind: "uups", 
             unsafeAllowLinkedLibraries: true, 

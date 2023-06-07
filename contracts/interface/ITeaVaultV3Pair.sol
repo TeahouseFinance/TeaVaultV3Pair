@@ -7,6 +7,7 @@ interface ITeaVaultV3Pair {
 
     error PoolNotInitialized();
     error InvalidFeePercentage();
+    error InvalidFeeCap();
     error InvalidShareAmount();
     error PositionLengthExceedsLimit();
     error InvalidPriceSlippage(uint256 amount0, uint256 amount1);
@@ -20,7 +21,7 @@ interface ITeaVaultV3Pair {
     error InvalidSwapToken();
     error InvalidSwapReceiver();
     error InsufficientSwapResult(uint256 minAmount, uint256 convertedAmount);
-    error InvalidTokenOrder();    
+    error InvalidTokenOrder();
 
     event TeaVaultV3PairCreated(address indexed teaVaultAddress);
     event FeeConfigChanged(address indexed sender, uint256 timestamp, FeeConfig feeConfig);
