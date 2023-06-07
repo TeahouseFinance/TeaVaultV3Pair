@@ -39,7 +39,6 @@ contract TeaVaultV3Pair is
 
     uint256 public SECONDS_IN_A_YEAR;
     uint256 public DECIMALS_MULTIPLIER;
-    uint256 public FEE_CAP;
     uint256 public FEE_MULTIPLIER;
     uint8 internal DECIMALS;
     uint8 internal MAX_POSITION_LENGTH;
@@ -56,6 +55,7 @@ contract TeaVaultV3Pair is
     uint256 public lastCollectManagementFee;
 
     IGenericRouter1Inch public router1Inch;
+    uint256 public FEE_CAP;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
