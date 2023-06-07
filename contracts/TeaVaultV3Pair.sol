@@ -64,6 +64,7 @@ contract TeaVaultV3Pair is
         address _token1,
         uint24 _feeTier,
         uint8 _decimalOffset,
+        FeeConfig calldata _feeConfig,
         address _owner
     ) public initializer {
         __UUPSUpgradeable_init();
@@ -89,6 +90,7 @@ contract TeaVaultV3Pair is
         DECIMALS = _decimalOffset + token0.decimals();
 
         callbackStatus = 1;
+        _setFeeConfig(_feeConfig);
         transferOwnership(_owner);
 
         emit TeaVaultV3PairCreated(address(this));
@@ -127,6 +129,10 @@ contract TeaVaultV3Pair is
 
     /// @inheritdoc ITeaVaultV3Pair
     function setFeeConfig(FeeConfig calldata _feeConfig) external override onlyOwner {
+        _setFeeConfig(_feeConfig);
+    }
+
+    function _setFeeConfig(FeeConfig calldata _feeConfig) internal {
         if (_feeConfig.entryFee + _feeConfig.exitFee > FEE_MULTIPLIER) revert InvalidFeePercentage();
         if (_feeConfig.performanceFee > FEE_MULTIPLIER) revert InvalidFeePercentage();
         if (_feeConfig.managementFee > FEE_MULTIPLIER) revert InvalidFeePercentage();
