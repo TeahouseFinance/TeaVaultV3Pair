@@ -63,7 +63,7 @@ async function getQuoteFrom1Inch(chainId, fromToken, toToken, amount) {
 // toToken: address of target token
 // amount: amount of source token
 // fromAddress: address of source token holder
-// slippage: slippage (1 ~ 50)
+// slippage: slippage (0 ~ 50)
 async function getSwapFrom1Inch(chainId, fromToken, toToken, amount, fromAddress, slippage) {
     if (chainId == HARDHAT_NETWORK_CHAINID) chainId = OVERRIDE_CHAINID;
     const response = await fetch(FQDN_1INCH + 'v5.0/' + chainId + '/swap?'
@@ -265,7 +265,8 @@ async function deposit(helper, vault, preview, slippage, unwrapWeth = true, amou
         amount1max = preview.finalAmount1;
     }
 
-    const sharesMinusSlippage = preview.shares.mul(1000 - slippage).div(1000);
+    const slippageInt = Math.ceil(slippage * 10);
+    const sharesMinusSlippage = preview.shares.mul(1000 - slippageInt).div(1000);
 
     // actual deposit
     result.push(helper.interface.encodeFunctionData('deposit', [ sharesMinusSlippage, amount0max, amount1max ]));
@@ -348,7 +349,8 @@ async function withdraw(helper, vault, shares, target, slippage, unwrapWeth = tr
         // do nothing
     }
     else if (target == 1) {
-        const amountsMinusSlippage = amounts.withdrawnAmount1.mul(1000 - slippage).div(1000);
+        const slippageInt = Math.ceil(slippage * 10);
+        const amountsMinusSlippage = amounts.withdrawnAmount1.mul(1000 - slippageInt).div(1000);
 
         const swap = await getSwapFrom1Inch(network.chainId, token1, token0, amountsMinusSlippage, helper.address, slippage);
         const router1Inch = await helper.router1Inch();
@@ -359,7 +361,8 @@ async function withdraw(helper, vault, shares, target, slippage, unwrapWeth = tr
         result.push(swap.tx.data);
     }
     else if (target == 2) {
-        const amountsMinusSlippage = amounts.withdrawnAmount0.mul(1000 - slippage).div(1000);
+        const slippageInt = Math.ceil(slippage * 10);
+        const amountsMinusSlippage = amounts.withdrawnAmount0.mul(1000 - slippageInt).div(1000);
 
         const swap = await getSwapFrom1Inch(network.chainId, token0, token1, amountsMinusSlippage, helper.address, slippage);
         const router1Inch = await helper.router1Inch();

@@ -133,7 +133,7 @@ async function main() {
     const preview = await helperLib.previewDeposit(helper, vault, amount0, 0, amount1);
     console.log("previewDeposit:", preview);
 
-    const multicallData = await helperLib.deposit(helper, vault, preview, 5);
+    const multicallData = await helperLib.deposit(helper, vault, preview, 0.5);
 
     // perform multicall
     let sharesBefore = await vault.balanceOf(user.address);
@@ -156,7 +156,7 @@ async function main() {
     const withdraw = await helperLib.previewWithdraw(helper, vault.connect(user), shares);
     console.log("previewWithdraw:", withdraw);
 
-    const multicallData2 = await helperLib.withdraw(helper, vault.connect(user), shares, 1, 5);
+    const multicallData2 = await helperLib.withdraw(helper, vault.connect(user), shares, 1, 0.5);
 
     // perform multicall
     sharesBefore = await vault.balanceOf(user.address);
