@@ -17,6 +17,7 @@ interface ITeaVaultV3PairHelper is IGenericRouter1Inch {
     /// @notice This function converts all msg.value into WETH9, and transfer required token amounts from the caller to the contract,
     /// @notice perform the transactions specified in _data, then refund all remaining ETH and tokens back to the caller.
     /// @notice There should be no tokens or ETH left after each multicall.
+    /// @notice Only token0, token1 and native currency will be refunded, do not swap or transfer other tokens to the helper.
     /// @param _vault address of TeaVaultV3Pair vault for this transaction
     /// @param _amount0 Amount of token0 for use in this transaction
     /// @param _amount1 Amount of token1 for use in this transaction

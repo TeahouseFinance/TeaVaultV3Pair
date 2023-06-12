@@ -84,7 +84,7 @@ contract TeaVaultV3Pair is
         }
         
         SECONDS_IN_A_YEAR = 365 * 24 * 60 * 60;
-        DECIMALS_MULTIPLIER = 10 ** _decimalOffset;
+        DECIMALS_MULTIPLIER = 10 ** _decimalOffset; // prevent donation attack (audit ID:6)
         FEE_MULTIPLIER = 1000000;
         MAX_POSITION_LENGTH = 5;
 
@@ -103,7 +103,7 @@ contract TeaVaultV3Pair is
         FEE_CAP = _feeCap; 
         
         _setFeeConfig(_feeConfig); // set initial fee config (audit ID:2)
-        transferOwnership(_owner);
+        transferOwnership(_owner); // recommend the privileged roles to be a multi-sig account to enhance security (audit ID:3)
 
         emit TeaVaultV3PairCreated(address(this));
     }
