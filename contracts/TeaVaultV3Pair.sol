@@ -59,7 +59,7 @@ contract TeaVaultV3Pair is
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
-        _disableInitializers(); // prevent attack from using implementation contracts (audit ID:4)
+        _disableInitializers(); // prevent attackers from using implementation contracts (audit ID:4)
     }
 
     function initialize(
@@ -84,7 +84,7 @@ contract TeaVaultV3Pair is
         }
         
         SECONDS_IN_A_YEAR = 365 * 24 * 60 * 60;
-        DECIMALS_MULTIPLIER = 10 ** _decimalOffset; // prevent donation attack (audit ID:6)
+        DECIMALS_MULTIPLIER = 10 ** _decimalOffset; // avoid possible donation attack (audit ID:6)
         FEE_MULTIPLIER = 1000000;
         MAX_POSITION_LENGTH = 5;
 
@@ -103,7 +103,7 @@ contract TeaVaultV3Pair is
         FEE_CAP = _feeCap; 
         
         _setFeeConfig(_feeConfig); // set initial fee config (audit ID:2)
-        transferOwnership(_owner); // To enhance security, we recommend the privileged role (owner) to be a multi-sig account (audit ID:3)
+        transferOwnership(_owner); // To enhance security, we recommend using a multi-sig account for _owner (audit ID:3)
 
         emit TeaVaultV3PairCreated(address(this));
     }
