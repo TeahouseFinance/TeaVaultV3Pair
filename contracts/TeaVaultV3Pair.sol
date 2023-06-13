@@ -84,7 +84,7 @@ contract TeaVaultV3Pair is
         }
         
         SECONDS_IN_A_YEAR = 365 * 24 * 60 * 60;
-        DECIMALS_MULTIPLIER = 10 ** _decimalOffset; // avoid possible donation attack (audit ID:6)
+        DECIMALS_MULTIPLIER = 10 ** _decimalOffset;
         FEE_MULTIPLIER = 1000000;
         MAX_POSITION_LENGTH = 5;
 
