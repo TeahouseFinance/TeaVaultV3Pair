@@ -133,7 +133,7 @@ async function main() {
     const preview = await helperLib.previewDeposit(helper, vault, amount0, 0, amount1);
     console.log("previewDeposit:", preview);
 
-    const multicallData = await helperLib.deposit(helper, vault, preview, 5);
+    const multicallData = await helperLib.deposit(helper, vault, preview, 0.5);
 
     // perform multicall
     let sharesBefore = await vault.balanceOf(user.address);
@@ -141,7 +141,7 @@ async function main() {
     let token1Before = await token1.balanceOf(user.address);
     await token0.connect(user).approve(helper.address, ethers.utils.parseUnits("10000", await token0.decimals()));
     await token1.connect(user).approve(helper.address, ethers.utils.parseUnits("10000", await token1.decimals()));
-    await helper.connect(user).multicall(vault.address, amount0, amount1, multicallData, { value: 0 });
+    await helper.connect(user).multicall(vault.address, amount0, 0, multicallData, { value: amount1 });
     let sharesAfter = await vault.balanceOf(user.address);
     let token0After = await token0.balanceOf(user.address);
     let token1After = await token1.balanceOf(user.address);
@@ -156,7 +156,7 @@ async function main() {
     const withdraw = await helperLib.previewWithdraw(helper, vault.connect(user), shares);
     console.log("previewWithdraw:", withdraw);
 
-    const multicallData2 = await helperLib.withdraw(helper, vault.connect(user), shares, 1, 5);
+    const multicallData2 = await helperLib.withdraw(helper, vault.connect(user), shares, 1, 0.5);
 
     // perform multicall
     sharesBefore = await vault.balanceOf(user.address);

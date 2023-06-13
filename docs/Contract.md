@@ -75,6 +75,8 @@ function initialize(
     address _token1,
     uint24 _feeTier,
     uint8 _decimalOffset,
+    uint24 _feeCap,
+    FeeConfig calldata _feeConfig,    
     address _owner
 ) public initializer {}
 ```
@@ -90,13 +92,16 @@ function initialize(
     5. `address _token1`: Uniswap `pool` token1 address.
     6. `uint24 _feeTier`: Uniswap `pool` fee tier in bps.
     7. `uint8 _decimalOffset`: decimals used for increasing tokenized precision.
-    8. `address _owner`: new owner address.
+    8. `_feeCap`: upper limit of fees in _feeConfig.
+    9. `_feeConfig`: initial fee configuration.
+    10. `address _owner`: new owner address. It is advised to use a multisig account for better security.
 -   Returns: None
 -   Notes:
-    1.  Initialize after contract deployment.
+    1. Initialize after contract deployment.
+    2. It's advised that after initializing a vault, make a deposit as soon as possible to prevent a 'donation' attack, where an attack may inflate the share price by a significant amount and make future deposits more difficult.
 -   Actions:
-    1.  Set contract variables.
-    2.  Transfer ownership from deployer to `_owner`.
+    1. Set contract variables.
+    2. Transfer ownership from deployer to `_owner`.
 
 #### \_authorizeUpgrade
 

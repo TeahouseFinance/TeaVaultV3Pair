@@ -63,7 +63,7 @@ async function getQuoteFrom1Inch(chainId, fromToken, toToken, amount) {
 // toToken: address of target token
 // amount: amount of source token
 // fromAddress: address of source token holder
-// slippage: slippage (1 ~ 50)
+// slippage: slippage (0 ~ 50)
 async function getSwapFrom1Inch(chainId, fromToken, toToken, amount, fromAddress, slippage) {
     if (chainId == HARDHAT_NETWORK_CHAINID) chainId = OVERRIDE_CHAINID;
     const response = await fetch(FQDN_1INCH + 'v5.0/' + chainId + '/swap?'
@@ -95,7 +95,8 @@ async function getSwapFrom1Inch(chainId, fromToken, toToken, amount, fromAddress
 // amount0: total amount of token0
 // amount1: total amount of token1
 // eth: total amount of eth
-// convertAmount: amount of token needs to be converted
+// convertFromAmount: amount of tokens needs to be converted
+// convertToAmount: amount of tokens converted to
 // zeroToOne: true if convert from token0 to token1, false if from token1 to token0
 // finalAmount0: estimated amount of token0 after conversion
 // finalAmount1: estimated amount of token1 after conversion
@@ -132,19 +133,19 @@ async function previewDeposit(helper, vault, amount0, amount1, eth = undefined) 
         }
     }
 
-    let convertAmount;
+    let convertFromAmount;
     let zeroToOne;
 
     const ratio = await getVaultTokenRatio(vault);
     if (ratio.amount0.isZero()) {
         // does not need token0, convert all token0 to token1
-        convertAmount = amount0;
+        convertFromAmount = amount0;
         zeroToOne = true;
         convert1 = ethers.BigNumber.from(0);
     }
     else if (ratio.amount1.isZero()) {
         // does not need token1, convert all token1 to token0
-        convertAmount = amount1;
+        convertFromAmount = amount1;
         zeroToOne = false;
     }
     else {
@@ -156,38 +157,44 @@ async function previewDeposit(helper, vault, amount0, amount1, eth = undefined) 
             zeroToOne = false;
             const diff0 = requiredAmount0.sub(amount0);
             const quote = await getQuoteFrom1Inch(network.chainId, token0, token1, diff0);
-            convertAmount = ratio.amount0.mul(amount1).sub(ratio.amount1.mul(amount0));
-            convertAmount = convertAmount.div(ratio.amount1.mul(quote.fromTokenAmount).div(quote.toTokenAmount).add(ratio.amount0));
+            convertFromAmount = ratio.amount0.mul(amount1).sub(ratio.amount1.mul(amount0));
+            convertFromAmount = convertFromAmount.div(ratio.amount1.mul(quote.fromTokenAmount).div(quote.toTokenAmount).add(ratio.amount0));
         }
         else if (requiredAmount1.gt(amount1)) {
             // need more token1, convert some token0 to token1
             zeroToOne = true;
             const diff1 = requiredAmount1.sub(amount1);
             const quote = await getQuoteFrom1Inch(network.chainId, token1, token0, diff1);
-            convertAmount = ratio.amount1.mul(amount0).sub(ratio.amount0.mul(amount1));
-            convertAmount = convertAmount.div(ratio.amount0.mul(quote.fromTokenAmount).div(quote.toTokenAmount).add(ratio.amount1));
+            convertFromAmount = ratio.amount1.mul(amount0).sub(ratio.amount0.mul(amount1));
+            convertFromAmount = convertFromAmount.div(ratio.amount0.mul(quote.fromTokenAmount).div(quote.toTokenAmount).add(ratio.amount1));
         }
         else {
             // no conversion required
-            convertAmount = ethers.BigNumber.from(0);
+            convertFromAmount = ethers.BigNumber.from(0);
             zeroToOne = true;
         }
     }
 
     let finalAmount0 = amount0;
     let finalAmount1 = amount1;
+    let convertToAmount;
 
-    if (!convertAmount.isZero()) {
+    if (!convertFromAmount.isZero()) {
         if (zeroToOne) {
-            const quote = await getQuoteFrom1Inch(network.chainId, token0, token1, convertAmount);
+            const quote = await getQuoteFrom1Inch(network.chainId, token0, token1, convertFromAmount);
             finalAmount0 = amount0.sub(quote.fromTokenAmount);
             finalAmount1 = amount1.add(quote.toTokenAmount);
+            convertToAmount = ethers.BigNumber.from(quote.toTokenAmount);
         }
         else {
-            const quote = await getQuoteFrom1Inch(network.chainId, token1, token0, convertAmount);
+            const quote = await getQuoteFrom1Inch(network.chainId, token1, token0, convertFromAmount);
             finalAmount0 = amount0.add(quote.toTokenAmount);
             finalAmount1 = amount1.sub(quote.fromTokenAmount);
+            convertToAmount = ethers.BigNumber.from(quote.toTokenAmount);
         }
+    }
+    else {
+        convertToAmount = ethers.BigNumber.from(0)
     }
 
     const totalShares = await vault.totalSupply();
@@ -206,7 +213,8 @@ async function previewDeposit(helper, vault, amount0, amount1, eth = undefined) 
         amount0: originalAmount0,
         amount1: originalAmount1,
         eth: originalEth,
-        convertAmount: convertAmount,
+        convertFromAmount: convertFromAmount,
+        convertToAmount: convertToAmount,
         zeroToOne: zeroToOne,
         finalAmount0: finalAmount0,
         finalAmount1: finalAmount1,
@@ -235,12 +243,12 @@ async function deposit(helper, vault, preview, slippage, unwrapWeth = true, amou
     const token0 = await vault.assetToken0();
     const token1 = await vault.assetToken1();
 
-    if (!preview.convertAmount.isZero()) {
+    if (!preview.convertFromAmount.isZero()) {
         // need to convert something
         const fromToken = preview.zeroToOne ? token0 : token1;
         const toToken = preview.zeroToOne ? token1 : token0;
     
-        const swap = await getSwapFrom1Inch(network.chainId, fromToken, toToken, preview.convertAmount, helper.address, slippage);
+        const swap = await getSwapFrom1Inch(network.chainId, fromToken, toToken, preview.convertFromAmount, helper.address, slippage);
         const router1Inch = await helper.router1Inch();
         if (router1Inch.toLowerCase() != swap.tx.to.toLowerCase()) {
             throw new Error("1Inch router mismatch");
@@ -257,7 +265,8 @@ async function deposit(helper, vault, preview, slippage, unwrapWeth = true, amou
         amount1max = preview.finalAmount1;
     }
 
-    const sharesMinusSlippage = preview.shares.mul(1000 - slippage).div(1000);
+    const slippageInt = Math.ceil(slippage * 10);
+    const sharesMinusSlippage = preview.shares.mul(1000 - slippageInt).div(1000);
 
     // actual deposit
     result.push(helper.interface.encodeFunctionData('deposit', [ sharesMinusSlippage, amount0max, amount1max ]));
@@ -340,7 +349,8 @@ async function withdraw(helper, vault, shares, target, slippage, unwrapWeth = tr
         // do nothing
     }
     else if (target == 1) {
-        const amountsMinusSlippage = amounts.withdrawnAmount1.mul(1000 - slippage).div(1000);
+        const slippageInt = Math.ceil(slippage * 10);
+        const amountsMinusSlippage = amounts.withdrawnAmount1.mul(1000 - slippageInt).div(1000);
 
         const swap = await getSwapFrom1Inch(network.chainId, token1, token0, amountsMinusSlippage, helper.address, slippage);
         const router1Inch = await helper.router1Inch();
@@ -351,7 +361,8 @@ async function withdraw(helper, vault, shares, target, slippage, unwrapWeth = tr
         result.push(swap.tx.data);
     }
     else if (target == 2) {
-        const amountsMinusSlippage = amounts.withdrawnAmount0.mul(1000 - slippage).div(1000);
+        const slippageInt = Math.ceil(slippage * 10);
+        const amountsMinusSlippage = amounts.withdrawnAmount0.mul(1000 - slippageInt).div(1000);
 
         const swap = await getSwapFrom1Inch(network.chainId, token0, token1, amountsMinusSlippage, helper.address, slippage);
         const router1Inch = await helper.router1Inch();

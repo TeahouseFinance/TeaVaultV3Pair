@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Teahouse Finance
 
-pragma solidity ^0.8.0;
+pragma solidity =0.8.19;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
@@ -55,6 +55,12 @@ contract TeaVaultV3Pair is
     uint256 public lastCollectManagementFee;
 
     IGenericRouter1Inch public router1Inch;
+    uint256 public FEE_CAP;
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers(); // prevent attackers from using implementation contracts (audit ID:4)
+    }
 
     function initialize(
         string calldata _name,
@@ -64,6 +70,8 @@ contract TeaVaultV3Pair is
         address _token1,
         uint24 _feeTier,
         uint8 _decimalOffset,
+        uint24 _feeCap,
+        FeeConfig calldata _feeConfig,
         address _owner
     ) public initializer {
         __UUPSUpgradeable_init();
@@ -82,12 +90,20 @@ contract TeaVaultV3Pair is
 
         IUniswapV3Factory factory = IUniswapV3Factory(_factory);
         pool = IUniswapV3Pool(factory.getPool(_token0, _token1, _feeTier));
+        if (address(pool) == address(0)) revert PoolNotInitialized(); // Make sure the pool exists (audit ID:1)
+
         token0 = ERC20Upgradeable(_token0);
         token1 = ERC20Upgradeable(_token1);
         DECIMALS = _decimalOffset + token0.decimals();
 
         callbackStatus = 1;
-        transferOwnership(_owner);
+
+        // set a hardcap on fee configuration (audit ID:3)
+        if (_feeCap >= FEE_MULTIPLIER) revert InvalidFeeCap();
+        FEE_CAP = _feeCap; 
+        
+        _setFeeConfig(_feeConfig); // set initial fee config (audit ID:2)
+        transferOwnership(_owner); // To enhance security, we recommend using a multi-sig account for _owner (audit ID:3)
 
         emit TeaVaultV3PairCreated(address(this));
     }
@@ -125,9 +141,13 @@ contract TeaVaultV3Pair is
 
     /// @inheritdoc ITeaVaultV3Pair
     function setFeeConfig(FeeConfig calldata _feeConfig) external override onlyOwner {
-        if (_feeConfig.entryFee + _feeConfig.exitFee > FEE_MULTIPLIER) revert InvalidFeePercentage();
-        if (_feeConfig.performanceFee > FEE_MULTIPLIER) revert InvalidFeePercentage();
-        if (_feeConfig.managementFee > FEE_MULTIPLIER) revert InvalidFeePercentage();
+        _setFeeConfig(_feeConfig);
+    }
+
+    function _setFeeConfig(FeeConfig calldata _feeConfig) internal {
+        if (_feeConfig.entryFee + _feeConfig.exitFee > FEE_CAP) revert InvalidFeePercentage();
+        if (_feeConfig.performanceFee > FEE_CAP) revert InvalidFeePercentage();
+        if (_feeConfig.managementFee > FEE_CAP) revert InvalidFeePercentage();
 
         feeConfig = _feeConfig;
 
@@ -197,7 +217,7 @@ contract TeaVaultV3Pair is
             uint128 liquidity;
             bytes memory callbackData = abi.encode(msg.sender);
 
-            for (uint256 i = 0; i < positionLength; i++) {
+            for (uint256 i; i < positionLength; i++) {
                 Position storage position = positions[i];
 
                 liquidity = uint256(position.liquidity).mulDivRoundingUp(_shares, totalShares).toUint128();
@@ -222,8 +242,8 @@ contract TeaVaultV3Pair is
 
         // collect entry fee for users
         // do not collect entry fee for fee recipient
-        uint256 entryFeeAmount0 = 0;
-        uint256 entryFeeAmount1 = 0;
+        uint256 entryFeeAmount0;
+        uint256 entryFeeAmount1;
 
         if (msg.sender != feeConfig.vault) {
             entryFeeAmount0 = depositedAmount0.mulDivRoundingUp(feeConfig.entryFee, FEE_MULTIPLIER);
@@ -260,7 +280,7 @@ contract TeaVaultV3Pair is
 
         // collect exit fee for users
         // do not collect exit fee for fee recipient
-        uint256 exitFeeAmount = 0;
+        uint256 exitFeeAmount;
         if (msg.sender != feeConfig.vault) {
             // calculate exit fee
             exitFeeAmount = _shares.mulDivRoundingUp(feeConfig.exitFee, FEE_MULTIPLIER);
@@ -286,7 +306,7 @@ contract TeaVaultV3Pair is
         withdrawnAmount1 = token1.balanceOf(address(this)).mulDiv(_shares, totalShares);
 
         uint256 i;
-        for (i = 0; i < positionLength; i++) {
+        for (; i < positionLength; i++) {
             Position storage position = positions[i];
             int24 tickLower = position.tickLower;
             int24 tickUpper = position.tickUpper;
@@ -333,7 +353,7 @@ contract TeaVaultV3Pair is
         uint256 positionLength = positions.length;
         uint256 i;
 
-        for (i = 0; i < positionLength; i++) {
+        for (; i < positionLength; i++) {
             Position storage position = positions[i];
             if (position.tickLower == _tickLower && position.tickUpper == _tickUpper) {
                 (amount0, amount1) = _addLiquidity(_tickLower, _tickUpper, _liquidity, _amount0Min, _amount1Min);
@@ -364,7 +384,7 @@ contract TeaVaultV3Pair is
     ) external checkDeadline(_deadline) onlyManager returns (uint256 amount0, uint256 amount1) {
         uint256 positionLength = positions.length;
 
-        for (uint256 i = 0; i < positionLength; i++) {
+        for (uint256 i; i < positionLength; i++) {
             Position storage position = positions[i];
             if (position.tickLower == _tickLower && position.tickUpper == _tickUpper) {
                 // collect swap fee before remove liquidity to ensure correct calculation of performance fee
@@ -396,7 +416,7 @@ contract TeaVaultV3Pair is
     ) external onlyManager returns (uint128 amount0, uint128 amount1) {
         uint256 positionLength = positions.length;
 
-        for (uint256 i = 0; i < positionLength; i++) {
+        for (uint256 i; i < positionLength; i++) {
             Position storage position = positions[i];
             if (position.tickLower == _tickLower && position.tickUpper == _tickUpper) {
                 return _collectPositionSwapFee(position);
@@ -423,7 +443,7 @@ contract TeaVaultV3Pair is
         uint128 _amount0;
         uint128 _amount1;
 
-        for (uint256 i = 0; i < positionLength; i++) {
+        for (uint256 i; i < positionLength; i++) {
             Position storage position = positions[i];
             pool.burn(position.tickLower, position.tickUpper, 0);
             (_amount0, _amount1) = _collect(position.tickLower, position.tickUpper);
@@ -592,7 +612,7 @@ contract TeaVaultV3Pair is
     /// @inheritdoc ITeaVaultV3Pair
     function multicall(bytes[] calldata data) external returns (bytes[] memory results) {
         results = new bytes[](data.length);
-        for (uint256 i = 0; i < data.length; i++) {
+        for (uint256 i; i < data.length; i++) {
             (bool success, bytes memory returndata) = address(this).delegatecall(data[i]);
             results[i] = AddressUpgradeable.verifyCallResult(success, returndata, "Address: low-level delegate call failed");
         }
@@ -604,7 +624,8 @@ contract TeaVaultV3Pair is
         int24 _tickLower,
         int24 _tickUpper
     ) external override view returns (uint256 amount0, uint256 amount1, uint256 fee0, uint256 fee1) {
-        for (uint256 i = 0; i < positions.length; i++) {
+        uint256 positionsLength = positions.length;
+        for (uint256 i; i < positionsLength; i++) {
             Position storage position = positions[i];
             if (position.tickLower == _tickLower && position.tickUpper == _tickUpper) {
                 return VaultUtils.positionInfo(address(this), pool, positions[i]);
@@ -629,7 +650,8 @@ contract TeaVaultV3Pair is
         uint256 _fee0;
         uint256 _fee1;
 
-        for (uint256 i = 0; i < positions.length; i++) {
+        uint256 positionsLength = positions.length;
+        for (uint256 i; i < positionsLength; i++) {
             (_amount0, _amount1, _fee0, _fee1) = VaultUtils.positionInfo(address(this), pool, positions[i]);
             amount0 += _amount0;
             amount1 += _amount1;

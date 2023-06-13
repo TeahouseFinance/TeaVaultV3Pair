@@ -5,7 +5,9 @@ pragma solidity ^0.8.0;
 
 interface ITeaVaultV3Pair {
 
+    error PoolNotInitialized();
     error InvalidFeePercentage();
+    error InvalidFeeCap();
     error InvalidShareAmount();
     error PositionLengthExceedsLimit();
     error InvalidPriceSlippage(uint256 amount0, uint256 amount1);
@@ -19,7 +21,7 @@ interface ITeaVaultV3Pair {
     error InvalidSwapToken();
     error InvalidSwapReceiver();
     error InsufficientSwapResult(uint256 minAmount, uint256 convertedAmount);
-    error InvalidTokenOrder();    
+    error InvalidTokenOrder();
 
     event TeaVaultV3PairCreated(address indexed teaVaultAddress);
     event FeeConfigChanged(address indexed sender, uint256 timestamp, FeeConfig feeConfig);
@@ -69,8 +71,8 @@ interface ITeaVaultV3Pair {
     /// @return amount vault balance of token0
     function getToken0Balance() external view returns (uint256 amount);
 
-    /// @notice get vault balance of token0
-    /// @return amount vault balance of token0
+    /// @notice get vault balance of token1
+    /// @return amount vault balance of token1
     function getToken1Balance() external view returns (uint256 amount);
 
     /// @notice get pool token and price info
