@@ -20,14 +20,15 @@ function loadEnvVarInt(env, errorMsg) {
 // setup uniswapV3 parameters
 const name = loadEnvVar(process.env.NAME, "No NAME");
 const symbol = loadEnvVar(process.env.SYMBOL, "No SYMBOL");
-const factory = loadEnvVar(process.env.UNISWAP_TEST_FACTORY, "No UNISWAP_TEST_FACTORY");
-const token0 = loadEnvVar(process.env.UNISWAP_TEST_TOKEN0, "No UNISWAP_TEST_TOKEN0");
-const token1 = loadEnvVar(process.env.UNISWAP_TEST_TOKEN1, "No UNISWAP_TEST_TOKEN1");
-const feeTier = loadEnvVarInt(process.env.UNISWAP_TEST_FEE_TIER, "No UNISWAP_TEST_FEE_TIER");
-const decimalOffset = loadEnvVarInt(process.env.UNISWAP_TEST_DECIMAL_OFFSET, "No UNISWAP_TEST_DECIMAL_OFFSET");
+const factory = loadEnvVar(process.env.UNISWAP_FACTORY, "No UNISWAP_FACTORY");
+const token0 = loadEnvVar(process.env.UNISWAP_TOKEN0, "No UNISWAP_TOKEN0");
+const token1 = loadEnvVar(process.env.UNISWAP_TOKEN1, "No UNISWAP_TOKEN1");
+const feeTier = loadEnvVarInt(process.env.UNISWAP_FEE_TIER, "No UNISWAP_FEE_TIER");
+const decimalOffset = loadEnvVarInt(process.env.UNISWAP_DECIMAL_OFFSET, "No UNISWAP_DECIMAL_OFFSET");
 const owner = loadEnvVar(process.env.OWNER, "No OWNER");
 
 const feeVault = loadEnvVar(process.env.FEE_VAULT, "No FEE_VAULT");
+const feeCap = loadEnvVar(process.env.FEE_CAP, "No FEE_CAP");
 const entryFee = loadEnvVarInt(process.env.ENTRY_FEE, "No ENTRY_FEE");
 const exitFee = loadEnvVarInt(process.env.EXIT_FEE, "No EXIT_FEE");
 const performanceFee = loadEnvVarInt(process.env.PPERFORMANCE_FEE, "No PPERFORMANCE_FEE");
@@ -54,7 +55,7 @@ async function main() {
 
     const vault = await upgrades.deployProxy(
         TeaVaultV3Pair,
-        [name, symbol, factory, token0, token1, feeTier, decimalOffset, owner],
+        [name, symbol, factory, token0, token1, feeTier, decimalOffset, feeCap, [feeVault, entryFee, exitFee, performanceFee, managementFee], owner],
         {
             kind: "uups",
             unsafeAllowLinkedLibraries: true,
@@ -65,12 +66,10 @@ async function main() {
     console.log("GenericRouter1Inch deployed", genericRouter1Inch.address);
     console.log("Vault depolyed", vault.address);
 
-    console.log("Vault depolyed", vault.address);
-    await vault.setFeeConfig([feeVault, entryFee, exitFee, performanceFee, managementFee]);
     await vault.assignManager(manager);
     await vault.assignRouter1Inch(oneInchRouter);
     await vault.transferOwnership(owner);
-    console.log("manager, 1inchRouter, fee set!");
+    console.log("manager and 1inchRouter set!");
 }
 
 main().catch((error) => {
