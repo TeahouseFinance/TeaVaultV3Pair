@@ -57,9 +57,13 @@ module.exports = {
             url: process.env.ARB_URL || "",
             accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
         },
+        tt: {
+            url: process.env.TT_URL || "",
+            accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+        },
         mumbai: {
             url: process.env.MUMBAI_URL || "",
-            accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],            
+            accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
         },
     },
     gasReporter: {
