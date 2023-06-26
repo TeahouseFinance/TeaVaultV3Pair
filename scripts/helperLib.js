@@ -19,6 +19,22 @@ module.exports = {
 
 const FQDN_1INCH = 'https://api.1inch.io/'
 
+// convert opt to URL query string
+function optToString(opt) {
+    let result = '';
+
+    Object.keys(opt).forEach((key) => {
+        const value = opt[key];
+        if (result != '') {
+            result += '&';
+        }
+
+        result += encodeURIComponent(key) + '=' + encodeURIComponent(value);
+    });
+
+    return result;
+}
+
 // get the ratio of token0 and token1 required to deposit into or withdraw from a vault
 // vault: a TeaVaultV3Pair contract object created using ethers.js
 // returns { amount0: amount of token0, amount1: amount of token1 }
@@ -40,13 +56,15 @@ async function is1InchHealthy(chainId) {
 // fromToken: address of source token
 // toToken: address of target token
 // amount: amount of source token
-async function getQuoteFrom1Inch(chainId, fromToken, toToken, amount) {
+async function getQuoteFrom1Inch(chainId, fromToken, toToken, amount, opt) {
     if (chainId == HARDHAT_NETWORK_CHAINID) chainId = OVERRIDE_CHAINID;
-    const response = await fetch(FQDN_1INCH + 'v5.0/' + chainId + '/quote?'
+    const optString = optToString(opt);
+    const url = FQDN_1INCH + 'v5.0/' + chainId + '/quote?'
         + 'fromTokenAddress=' + fromToken + '&'
         + 'toTokenAddress=' + toToken + '&'
         + 'amount=' + amount
-    );
+        + (optString == '' ? '' : '&' + optString);
+    const response = await fetch(url);
 
     if (response.status == 200) {
         const jsonData = await response.json();
@@ -64,16 +82,18 @@ async function getQuoteFrom1Inch(chainId, fromToken, toToken, amount) {
 // amount: amount of source token
 // fromAddress: address of source token holder
 // slippage: slippage (0 ~ 50)
-async function getSwapFrom1Inch(chainId, fromToken, toToken, amount, fromAddress, slippage) {
+async function getSwapFrom1Inch(chainId, fromToken, toToken, amount, fromAddress, slippage, opt) {
     if (chainId == HARDHAT_NETWORK_CHAINID) chainId = OVERRIDE_CHAINID;
-    const response = await fetch(FQDN_1INCH + 'v5.0/' + chainId + '/swap?'
+    const optString = optToString(opt);
+    const url = FQDN_1INCH + 'v5.0/' + chainId + '/swap?'
         + 'fromTokenAddress=' + fromToken + '&'
         + 'toTokenAddress=' + toToken + '&'
         + 'amount=' + amount + '&'
         + 'fromAddress=' + fromAddress + '&'
         + 'slippage=' + slippage + '&'
         + 'disableEstimate=true'
-    );
+        + (optString == '' ? '' : '&' + optString);
+    const response = await fetch(url);
 
     if (response.status == 200) {
         const jsonData = await response.json();
@@ -95,13 +115,14 @@ async function getSwapFrom1Inch(chainId, fromToken, toToken, amount, fromAddress
 // amount0: total amount of token0
 // amount1: total amount of token1
 // eth: total amount of eth
+// opt: optional parameters for 1inch
 // convertFromAmount: amount of tokens needs to be converted
 // convertToAmount: amount of tokens converted to
 // zeroToOne: true if convert from token0 to token1, false if from token1 to token0
 // finalAmount0: estimated amount of token0 after conversion
 // finalAmount1: estimated amount of token1 after conversion
 // shares: estimated amount of shares
-async function previewDeposit(helper, vault, amount0, amount1, eth = undefined) {
+async function previewDeposit(helper, vault, amount0, amount1, eth = undefined, opt = {}) {
     const network = await vault.provider.getNetwork();
     const healthy = await is1InchHealthy(network.chainId);
     if (!healthy) {
@@ -156,7 +177,7 @@ async function previewDeposit(helper, vault, amount0, amount1, eth = undefined) 
             // need more token0, convert some token1 to token0
             zeroToOne = false;
             const diff0 = requiredAmount0.sub(amount0);
-            const quote = await getQuoteFrom1Inch(network.chainId, token0, token1, diff0);
+            const quote = await getQuoteFrom1Inch(network.chainId, token0, token1, diff0, opt);
             convertFromAmount = ratio.amount0.mul(amount1).sub(ratio.amount1.mul(amount0));
             convertFromAmount = convertFromAmount.div(ratio.amount1.mul(quote.fromTokenAmount).div(quote.toTokenAmount).add(ratio.amount0));
         }
@@ -164,7 +185,7 @@ async function previewDeposit(helper, vault, amount0, amount1, eth = undefined) 
             // need more token1, convert some token0 to token1
             zeroToOne = true;
             const diff1 = requiredAmount1.sub(amount1);
-            const quote = await getQuoteFrom1Inch(network.chainId, token1, token0, diff1);
+            const quote = await getQuoteFrom1Inch(network.chainId, token1, token0, diff1, opt);
             convertFromAmount = ratio.amount1.mul(amount0).sub(ratio.amount0.mul(amount1));
             convertFromAmount = convertFromAmount.div(ratio.amount0.mul(quote.fromTokenAmount).div(quote.toTokenAmount).add(ratio.amount1));
         }
@@ -181,13 +202,13 @@ async function previewDeposit(helper, vault, amount0, amount1, eth = undefined) 
 
     if (!convertFromAmount.isZero()) {
         if (zeroToOne) {
-            const quote = await getQuoteFrom1Inch(network.chainId, token0, token1, convertFromAmount);
+            const quote = await getQuoteFrom1Inch(network.chainId, token0, token1, convertFromAmount, opt);
             finalAmount0 = amount0.sub(quote.fromTokenAmount);
             finalAmount1 = amount1.add(quote.toTokenAmount);
             convertToAmount = ethers.BigNumber.from(quote.toTokenAmount);
         }
         else {
-            const quote = await getQuoteFrom1Inch(network.chainId, token1, token0, convertFromAmount);
+            const quote = await getQuoteFrom1Inch(network.chainId, token1, token0, convertFromAmount, opt);
             finalAmount0 = amount0.add(quote.toTokenAmount);
             finalAmount1 = amount1.sub(quote.fromTokenAmount);
             convertToAmount = ethers.BigNumber.from(quote.toTokenAmount);
@@ -218,7 +239,8 @@ async function previewDeposit(helper, vault, amount0, amount1, eth = undefined) 
         zeroToOne: zeroToOne,
         finalAmount0: finalAmount0,
         finalAmount1: finalAmount1,
-        shares: shares
+        shares: shares,
+        opt: opt
     };
 }
 
@@ -248,7 +270,7 @@ async function deposit(helper, vault, preview, slippage, unwrapWeth = true, amou
         const fromToken = preview.zeroToOne ? token0 : token1;
         const toToken = preview.zeroToOne ? token1 : token0;
     
-        const swap = await getSwapFrom1Inch(network.chainId, fromToken, toToken, preview.convertFromAmount, helper.address, slippage);
+        const swap = await getSwapFrom1Inch(network.chainId, fromToken, toToken, preview.convertFromAmount, helper.address, slippage, preview.opt);
         const router1Inch = await helper.router1Inch();
         if (router1Inch.toLowerCase() != swap.tx.to.toLowerCase()) {
             throw new Error("1Inch router mismatch");
@@ -286,12 +308,13 @@ async function deposit(helper, vault, preview, slippage, unwrapWeth = true, amou
 // helper: a TeaVaultV3PairHelper contract object created using ethers.js
 // vault: a TeaVaultV3Pair contract object created using ethers.js
 // shares: amount of shares to withdraw
+// opt: optional parameters for 1inch
 // returns:
 // amount0: estimated amount of token0 to be withdrawn
 // amount1: estimated amount of token1 to be withdrawm
 // convertToToken0: estimated total amount of token0 if convert all token1 into token0
 // convertToToken1: estimated total amount of token1 if convert all token0 into token1
-async function previewWithdraw(helper, vault, shares) {
+async function previewWithdraw(helper, vault, shares, opt = {}) {
     const network = await vault.provider.getNetwork();
     const healthy = await is1InchHealthy(network.chainId);
     if (!healthy) {
@@ -304,18 +327,18 @@ async function previewWithdraw(helper, vault, shares) {
     const amounts = await vault.callStatic.withdraw(shares, 0, 0);
 
     // estimate convertToToken0 by converting all token1 to token0
-    const quote0 = await getQuoteFrom1Inch(network.chainId, token1, token0, amounts.withdrawnAmount1);
+    const quote0 = await getQuoteFrom1Inch(network.chainId, token1, token0, amounts.withdrawnAmount1, opt);
     const convertToToken0 = amounts.withdrawnAmount0.add(quote0.toTokenAmount);
 
     // estimate convertToToken0 by converting all token1 to token0
-    const quote1 = await getQuoteFrom1Inch(network.chainId, token0, token1, amounts.withdrawnAmount0);
+    const quote1 = await getQuoteFrom1Inch(network.chainId, token0, token1, amounts.withdrawnAmount0, opt);
     const convertToToken1 = amounts.withdrawnAmount1.add(quote1.toTokenAmount);
 
     return {
         amount0: amounts.withdrawnAmount0,
         amount1: amounts.withdrawnAmount1,
         convertToToken0: convertToToken0,
-        convertToToken1: convertToToken1
+        convertToToken1: convertToToken1,
     };
 }
 
@@ -328,8 +351,9 @@ async function previewWithdraw(helper, vault, shares) {
 // unwrapWeth: true to unwrap WETH to ETH
 // amount0min: minimum amount of token0 to withdraw
 // amount1min: minimum amount of token1 to withdraw
+// opt: optional parameters for 1inch
 // returns: multicall data for calling the multicall function
-async function withdraw(helper, vault, shares, target, slippage, unwrapWeth = true, amount0min = 0, amount1min = 0) {
+async function withdraw(helper, vault, shares, target, slippage, unwrapWeth = true, amount0min = 0, amount1min = 0, opt = {}) {
     const network = await vault.provider.getNetwork();
     const healthy = await is1InchHealthy(network.chainId);
     if (!healthy) {
@@ -352,7 +376,7 @@ async function withdraw(helper, vault, shares, target, slippage, unwrapWeth = tr
         const slippageInt = Math.ceil(slippage * 10);
         const amountsMinusSlippage = amounts.withdrawnAmount1.mul(1000 - slippageInt).div(1000);
 
-        const swap = await getSwapFrom1Inch(network.chainId, token1, token0, amountsMinusSlippage, helper.address, slippage);
+        const swap = await getSwapFrom1Inch(network.chainId, token1, token0, amountsMinusSlippage, helper.address, slippage, opt);
         const router1Inch = await helper.router1Inch();
         if (router1Inch.toLowerCase() != swap.tx.to.toLowerCase()) {
             throw new Error("1Inch router mismatch");
@@ -364,7 +388,7 @@ async function withdraw(helper, vault, shares, target, slippage, unwrapWeth = tr
         const slippageInt = Math.ceil(slippage * 10);
         const amountsMinusSlippage = amounts.withdrawnAmount0.mul(1000 - slippageInt).div(1000);
 
-        const swap = await getSwapFrom1Inch(network.chainId, token0, token1, amountsMinusSlippage, helper.address, slippage);
+        const swap = await getSwapFrom1Inch(network.chainId, token0, token1, amountsMinusSlippage, helper.address, slippage, opt);
         const router1Inch = await helper.router1Inch();
         if (router1Inch.toLowerCase() != swap.tx.to.toLowerCase()) {
             throw new Error("1Inch router mismatch");

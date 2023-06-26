@@ -26,6 +26,7 @@ const testToken0 = loadEnvVar(process.env.UNISWAP_TEST_TOKEN0, "No UNISWAP_TEST_
 const testToken1 = loadEnvVar(process.env.UNISWAP_TEST_TOKEN1, "No UNISWAP_TEST_TOKEN1");
 const testFeeTier = loadEnvVarInt(process.env.UNISWAP_TEST_FEE_TIER, "No UNISWAP_TEST_FEE_TIER");
 const testDecimalOffset = loadEnvVarInt(process.env.UNISWAP_TEST_DECIMAL_OFFSET, "No UNISWAP_TEST_DECIMAL_OFFSET");
+
 const testToken0Whale = loadEnvVar(process.env.UNISWAP_TEST_TOKEN0_WHALE, "No UNISWAP_TEST_TOKEN0_WHALE");
 const testToken1Whale = loadEnvVar(process.env.UNISWAP_TEST_TOKEN1_WHALE, "No UNISWAP_TEST_TOKEN1_WHALE");
 const test1InchRouter = loadEnvVar(process.env.UNISWAP_TEST_1INCH_ROUTER, "No UNISWAP_TEST_1INCH_ROUTER");
@@ -74,8 +75,15 @@ async function setupContracts() {
         },
     });
 
+    const feeCap = '200000';
+    const feeVault = owner.address;
+    const entryFee = '0';
+    const exitFee = '0';
+    const performanceFee = '0';
+    const managementFee = '0';
+
     const vault = await upgrades.deployProxy(TeaVaultV3Pair,
-        [ "Test Vault", "TVault", testFactory, token0.address, token1.address, testFeeTier, testDecimalOffset, owner.address, ],
+        [ "Test Vault", "TVault", testFactory, token0.address, token1.address, testFeeTier, testDecimalOffset, feeCap, [feeVault, entryFee, exitFee, performanceFee, managementFee], owner.address, ],
         { 
             kind: "uups", 
             unsafeAllowLinkedLibraries: true, 
@@ -130,10 +138,14 @@ async function main() {
 
     const amount0 = ethers.utils.parseUnits("100", await token0.decimals());
     const amount1 = ethers.utils.parseUnits("1", await token1.decimals());
-    const preview = await helperLib.previewDeposit(helper, vault, amount0, 0, amount1);
+    const opt = {
+        mainRouteParts: 5
+    };
+    const preview = await helperLib.previewDeposit(helper, vault, amount0, 0, amount1, opt);
     console.log("previewDeposit:", preview);
 
     const multicallData = await helperLib.deposit(helper, vault, preview, 0.5);
+    //console.log(multicallData);
 
     // perform multicall
     let sharesBefore = await vault.balanceOf(user.address);
@@ -153,10 +165,10 @@ async function main() {
 
     // preview withdraw
     const shares = sharesAfter.sub(sharesBefore);
-    const withdraw = await helperLib.previewWithdraw(helper, vault.connect(user), shares);
+    const withdraw = await helperLib.previewWithdraw(helper, vault.connect(user), shares, opt);
     console.log("previewWithdraw:", withdraw);
 
-    const multicallData2 = await helperLib.withdraw(helper, vault.connect(user), shares, 1, 0.5);
+    const multicallData2 = await helperLib.withdraw(helper, vault.connect(user), shares, 1, 0.5, true, 0, 0, opt);
 
     // perform multicall
     sharesBefore = await vault.balanceOf(user.address);
