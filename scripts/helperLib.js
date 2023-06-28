@@ -65,12 +65,14 @@ async function getQuoteFrom1Inch(chainId, fromToken, toToken, amount, opt) {
         + 'amount=' + amount
         + (optString == '' ? '' : '&' + optString);
     const response = await fetch(url);
+    //console.log(url);
 
     if (response.status == 200) {
         const jsonData = await response.json();
         return jsonData;
     }
     else {
+        //console.log(await response.json());
         throw new Error("Unable to get quote from 1Inch");
     }
 }
@@ -94,13 +96,14 @@ async function getSwapFrom1Inch(chainId, fromToken, toToken, amount, fromAddress
         + 'disableEstimate=true'
         + (optString == '' ? '' : '&' + optString);
     const response = await fetch(url);
+    //console.log(url);
 
     if (response.status == 200) {
         const jsonData = await response.json();
         return jsonData;
     }
     else {
-        console.log(response);
+        //console.log(await response.json());
         throw new Error("Unable to get swap from 1Inch");
     }
 }

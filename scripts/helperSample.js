@@ -139,7 +139,9 @@ async function main() {
     const amount0 = ethers.utils.parseUnits("100", await token0.decimals());
     const amount1 = ethers.utils.parseUnits("1", await token1.decimals());
     const opt = {
-        mainRouteParts: 5
+//        gasLimit: 10000,
+//        mainRouteParts: 5
+        connectorTokens: token0.address + ',' + token1.address
     };
     const preview = await helperLib.previewDeposit(helper, vault, amount0, 0, amount1, opt);
     console.log("previewDeposit:", preview);
@@ -169,6 +171,7 @@ async function main() {
     console.log("previewWithdraw:", withdraw);
 
     const multicallData2 = await helperLib.withdraw(helper, vault.connect(user), shares, 1, 0.5, true, 0, 0, opt);
+    //console.log(multicallData2);
 
     // perform multicall
     sharesBefore = await vault.balanceOf(user.address);
