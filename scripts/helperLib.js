@@ -165,7 +165,6 @@ async function previewDeposit(helper, vault, amount0, amount1, eth = undefined, 
         // does not need token0, convert all token0 to token1
         convertFromAmount = amount0;
         zeroToOne = true;
-        convert1 = ethers.BigNumber.from(0);
     }
     else if (ratio.amount1.isZero()) {
         // does not need token1, convert all token1 to token0
@@ -260,6 +259,7 @@ async function deposit(helper, vault, preview, slippage, unwrapWeth = true, amou
     const network = await vault.provider.getNetwork();
     const healthy = await is1InchHealthy(network.chainId);
     if (!healthy) {
+        console.log("A");
         throw new Error("1Inch network not healthy");
     }
 
@@ -330,12 +330,18 @@ async function previewWithdraw(helper, vault, shares, opt = {}) {
     const amounts = await vault.callStatic.withdraw(shares, 0, 0);
 
     // estimate convertToToken0 by converting all token1 to token0
-    const quote0 = await getQuoteFrom1Inch(network.chainId, token1, token0, amounts.withdrawnAmount1, opt);
-    const convertToToken0 = amounts.withdrawnAmount0.add(quote0.toTokenAmount);
+    let convertToToken0 = amounts.withdrawnAmount0;
+    if (!amounts.withdrawnAmount1.isZero()) {
+        const quote0 = await getQuoteFrom1Inch(network.chainId, token1, token0, amounts.withdrawnAmount1, opt);
+        convertToToken0 = convertToToken0.add(quote0.toTokenAmount);    
+    }
 
     // estimate convertToToken0 by converting all token1 to token0
-    const quote1 = await getQuoteFrom1Inch(network.chainId, token0, token1, amounts.withdrawnAmount0, opt);
-    const convertToToken1 = amounts.withdrawnAmount1.add(quote1.toTokenAmount);
+    let convertToToken1 = amounts.withdrawnAmount1;
+    if (!amounts.withdrawnAmount0.isZero()) {
+        const quote1 = await getQuoteFrom1Inch(network.chainId, token0, token1, amounts.withdrawnAmount0, opt);
+        convertToToken1 = convertToToken1.add(quote1.toTokenAmount);
+    }
 
     return {
         amount0: amounts.withdrawnAmount0,
@@ -376,28 +382,32 @@ async function withdraw(helper, vault, shares, target, slippage, unwrapWeth = tr
         // do nothing
     }
     else if (target == 1) {
-        const slippageInt = Math.ceil(slippage * 10);
-        const amountsMinusSlippage = amounts.withdrawnAmount1.mul(1000 - slippageInt).div(1000);
+        if (!amounts.withdrawnAmount1.isZero()) {
+            const slippageInt = Math.ceil(slippage * 10);
+            const amountsMinusSlippage = amounts.withdrawnAmount1.mul(1000 - slippageInt).div(1000);
 
-        const swap = await getSwapFrom1Inch(network.chainId, token1, token0, amountsMinusSlippage, helper.address, slippage, opt);
-        const router1Inch = await helper.router1Inch();
-        if (router1Inch.toLowerCase() != swap.tx.to.toLowerCase()) {
-            throw new Error("1Inch router mismatch");
+            const swap = await getSwapFrom1Inch(network.chainId, token1, token0, amountsMinusSlippage, helper.address, slippage, opt);
+            const router1Inch = await helper.router1Inch();
+            if (router1Inch.toLowerCase() != swap.tx.to.toLowerCase()) {
+                throw new Error("1Inch router mismatch");
+            }
+
+            result.push(swap.tx.data);
         }
-
-        result.push(swap.tx.data);
     }
     else if (target == 2) {
-        const slippageInt = Math.ceil(slippage * 10);
-        const amountsMinusSlippage = amounts.withdrawnAmount0.mul(1000 - slippageInt).div(1000);
+        if (!amounts.withdrawnAmount0.isZero()) {
+            const slippageInt = Math.ceil(slippage * 10);
+            const amountsMinusSlippage = amounts.withdrawnAmount0.mul(1000 - slippageInt).div(1000);
 
-        const swap = await getSwapFrom1Inch(network.chainId, token0, token1, amountsMinusSlippage, helper.address, slippage, opt);
-        const router1Inch = await helper.router1Inch();
-        if (router1Inch.toLowerCase() != swap.tx.to.toLowerCase()) {
-            throw new Error("1Inch router mismatch");
+            const swap = await getSwapFrom1Inch(network.chainId, token0, token1, amountsMinusSlippage, helper.address, slippage, opt);
+            const router1Inch = await helper.router1Inch();
+            if (router1Inch.toLowerCase() != swap.tx.to.toLowerCase()) {
+                throw new Error("1Inch router mismatch");
+            }
+
+            result.push(swap.tx.data);
         }
-
-        result.push(swap.tx.data);
     }
     else {
         throw new Error("Invalid target");
