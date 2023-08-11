@@ -8,6 +8,7 @@ const HARDHAT_NETWORK_CHAINID = 31337;
 const OVERRIDE_CHAINID = 1; // override chainId for forked hardhat network
 
 module.exports = {
+    setAPIKey,
     getVaultTokenRatio,
     is1InchHealthy,
     getQuoteFrom1Inch,
@@ -17,7 +18,12 @@ module.exports = {
     withdraw
 };
 
-const FQDN_1INCH = 'https://api.1inch.io/'
+const FQDN_1INCH = 'https://api.1inch.dev/swap/'
+let apiKey = '';
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 // convert opt to URL query string
 function optToString(opt) {
@@ -35,6 +41,10 @@ function optToString(opt) {
     return result;
 }
 
+function setAPIKey(apikey) {
+    apiKey = apikey;
+}
+
 // get the ratio of token0 and token1 required to deposit into or withdraw from a vault
 // vault: a TeaVaultV3Pair contract object created using ethers.js
 // returns { amount0: amount of token0, amount1: amount of token1 }
@@ -46,8 +56,20 @@ async function getVaultTokenRatio(vault) {
 // check 1inch API status
 // chainId: chainId
 async function is1InchHealthy(chainId) {
+    if (apiKey == '') {
+        throw "API key not set";
+    }
+
     if (chainId == HARDHAT_NETWORK_CHAINID) chainId = OVERRIDE_CHAINID;
-    const response = await fetch(FQDN_1INCH + 'v5.0/' + chainId + '/healthcheck');
+    const response = await fetch(FQDN_1INCH + 'v5.2/' + chainId + '/healthcheck', {
+        headers: {
+            "accept": "application/json",
+            "Authorization": "Bearer " + apiKey,
+        },
+    });
+
+    await sleep(1000);
+    
     return response.status == 200;
 }
 
@@ -57,22 +79,32 @@ async function is1InchHealthy(chainId) {
 // toToken: address of target token
 // amount: amount of source token
 async function getQuoteFrom1Inch(chainId, fromToken, toToken, amount, opt) {
+    if (apiKey == '') {
+        throw "API key not set";
+    }
+
     if (chainId == HARDHAT_NETWORK_CHAINID) chainId = OVERRIDE_CHAINID;
     const optString = optToString(opt);
-    const url = FQDN_1INCH + 'v5.0/' + chainId + '/quote?'
-        + 'fromTokenAddress=' + fromToken + '&'
-        + 'toTokenAddress=' + toToken + '&'
+    const url = FQDN_1INCH + 'v5.2/' + chainId + '/quote?'
+        + 'src=' + fromToken + '&'
+        + 'dst=' + toToken + '&'
         + 'amount=' + amount
         + (optString == '' ? '' : '&' + optString);
-    const response = await fetch(url);
+    const response = await fetch(url, {
+        headers: {
+            "accept": "application/json",
+            "Authorization": "Bearer " + apiKey,
+        },        
+    });
     //console.log(url);
+    await sleep(1000);
 
     if (response.status == 200) {
         const jsonData = await response.json();
         return jsonData;
     }
     else {
-        //console.log(await response.json());
+        console.log(await response.json());
         throw new Error("Unable to get quote from 1Inch");
     }
 }
@@ -85,18 +117,28 @@ async function getQuoteFrom1Inch(chainId, fromToken, toToken, amount, opt) {
 // fromAddress: address of source token holder
 // slippage: slippage (0 ~ 50)
 async function getSwapFrom1Inch(chainId, fromToken, toToken, amount, fromAddress, slippage, opt) {
+    if (apiKey == '') {
+        throw "API key not set";
+    }
+
     if (chainId == HARDHAT_NETWORK_CHAINID) chainId = OVERRIDE_CHAINID;
     const optString = optToString(opt);
-    const url = FQDN_1INCH + 'v5.0/' + chainId + '/swap?'
-        + 'fromTokenAddress=' + fromToken + '&'
-        + 'toTokenAddress=' + toToken + '&'
+    const url = FQDN_1INCH + 'v5.2/' + chainId + '/swap?'
+        + 'src=' + fromToken + '&'
+        + 'dst=' + toToken + '&'
         + 'amount=' + amount + '&'
-        + 'fromAddress=' + fromAddress + '&'
+        + 'from=' + fromAddress + '&'
         + 'slippage=' + slippage + '&'
         + 'disableEstimate=true'
         + (optString == '' ? '' : '&' + optString);
-    const response = await fetch(url);
+    const response = await fetch(url, {
+        headers: {
+            "accept": "application/json",
+            "Authorization": "Bearer " + apiKey,
+        },        
+    });
     //console.log(url);
+    await sleep(1000);
 
     if (response.status == 200) {
         const jsonData = await response.json();
@@ -127,10 +169,6 @@ async function getSwapFrom1Inch(chainId, fromToken, toToken, amount, fromAddress
 // shares: estimated amount of shares
 async function previewDeposit(helper, vault, amount0, amount1, eth = undefined, opt = {}) {
     const network = await vault.provider.getNetwork();
-    const healthy = await is1InchHealthy(network.chainId);
-    if (!healthy) {
-        throw new Error("1Inch network not healthy");
-    }
 
     const token0 = await vault.assetToken0();
     const token1 = await vault.assetToken1();
@@ -181,7 +219,7 @@ async function previewDeposit(helper, vault, amount0, amount1, eth = undefined, 
             const diff0 = requiredAmount0.sub(amount0);
             const quote = await getQuoteFrom1Inch(network.chainId, token0, token1, diff0, opt);
             convertFromAmount = ratio.amount0.mul(amount1).sub(ratio.amount1.mul(amount0));
-            convertFromAmount = convertFromAmount.div(ratio.amount1.mul(quote.fromTokenAmount).div(quote.toTokenAmount).add(ratio.amount0));
+            convertFromAmount = convertFromAmount.div(ratio.amount1.mul(diff0).div(quote.toAmount).add(ratio.amount0));
         }
         else if (requiredAmount1.gt(amount1)) {
             // need more token1, convert some token0 to token1
@@ -189,7 +227,7 @@ async function previewDeposit(helper, vault, amount0, amount1, eth = undefined, 
             const diff1 = requiredAmount1.sub(amount1);
             const quote = await getQuoteFrom1Inch(network.chainId, token1, token0, diff1, opt);
             convertFromAmount = ratio.amount1.mul(amount0).sub(ratio.amount0.mul(amount1));
-            convertFromAmount = convertFromAmount.div(ratio.amount0.mul(quote.fromTokenAmount).div(quote.toTokenAmount).add(ratio.amount1));
+            convertFromAmount = convertFromAmount.div(ratio.amount0.mul(diff1).div(quote.toAmount).add(ratio.amount1));
         }
         else {
             // no conversion required
@@ -205,15 +243,15 @@ async function previewDeposit(helper, vault, amount0, amount1, eth = undefined, 
     if (!convertFromAmount.isZero()) {
         if (zeroToOne) {
             const quote = await getQuoteFrom1Inch(network.chainId, token0, token1, convertFromAmount, opt);
-            finalAmount0 = amount0.sub(quote.fromTokenAmount);
-            finalAmount1 = amount1.add(quote.toTokenAmount);
-            convertToAmount = ethers.BigNumber.from(quote.toTokenAmount);
+            finalAmount0 = amount0.sub(convertFromAmount);
+            finalAmount1 = amount1.add(quote.toAmount);
+            convertToAmount = ethers.BigNumber.from(quote.toAmount);
         }
         else {
             const quote = await getQuoteFrom1Inch(network.chainId, token1, token0, convertFromAmount, opt);
-            finalAmount0 = amount0.add(quote.toTokenAmount);
-            finalAmount1 = amount1.sub(quote.fromTokenAmount);
-            convertToAmount = ethers.BigNumber.from(quote.toTokenAmount);
+            finalAmount0 = amount0.add(quote.toAmount);
+            finalAmount1 = amount1.sub(convertFromAmount);
+            convertToAmount = ethers.BigNumber.from(quote.toAmount);
         }
     }
     else {
@@ -257,11 +295,6 @@ async function previewDeposit(helper, vault, amount0, amount1, eth = undefined, 
 // returns: multicall data for calling the multicall function
 async function deposit(helper, vault, preview, slippage, unwrapWeth = true, amount0max = undefined, amount1max = undefined) {
     const network = await vault.provider.getNetwork();
-    const healthy = await is1InchHealthy(network.chainId);
-    if (!healthy) {
-        console.log("A");
-        throw new Error("1Inch network not healthy");
-    }
 
     let result = [];
 
@@ -319,10 +352,6 @@ async function deposit(helper, vault, preview, slippage, unwrapWeth = true, amou
 // convertToToken1: estimated total amount of token1 if convert all token0 into token1
 async function previewWithdraw(helper, vault, shares, opt = {}) {
     const network = await vault.provider.getNetwork();
-    const healthy = await is1InchHealthy(network.chainId);
-    if (!healthy) {
-        throw new Error("1Inch network not healthy");
-    }
 
     const token0 = await vault.assetToken0();
     const token1 = await vault.assetToken1();
@@ -333,14 +362,14 @@ async function previewWithdraw(helper, vault, shares, opt = {}) {
     let convertToToken0 = amounts.withdrawnAmount0;
     if (!amounts.withdrawnAmount1.isZero()) {
         const quote0 = await getQuoteFrom1Inch(network.chainId, token1, token0, amounts.withdrawnAmount1, opt);
-        convertToToken0 = convertToToken0.add(quote0.toTokenAmount);    
+        convertToToken0 = convertToToken0.add(quote0.toAmount);    
     }
 
     // estimate convertToToken0 by converting all token1 to token0
     let convertToToken1 = amounts.withdrawnAmount1;
     if (!amounts.withdrawnAmount0.isZero()) {
         const quote1 = await getQuoteFrom1Inch(network.chainId, token0, token1, amounts.withdrawnAmount0, opt);
-        convertToToken1 = convertToToken1.add(quote1.toTokenAmount);
+        convertToToken1 = convertToToken1.add(quote1.toAmount);
     }
 
     return {
@@ -364,10 +393,6 @@ async function previewWithdraw(helper, vault, shares, opt = {}) {
 // returns: multicall data for calling the multicall function
 async function withdraw(helper, vault, shares, target, slippage, unwrapWeth = true, amount0min = 0, amount1min = 0, opt = {}) {
     const network = await vault.provider.getNetwork();
-    const healthy = await is1InchHealthy(network.chainId);
-    if (!healthy) {
-        throw new Error("1Inch network not healthy");
-    }
 
     let result = [];
 

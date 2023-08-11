@@ -32,9 +32,10 @@ const testToken1Whale = loadEnvVar(process.env.UNISWAP_TEST_TOKEN1_WHALE, "No UN
 const test1InchRouter = loadEnvVar(process.env.UNISWAP_TEST_1INCH_ROUTER, "No UNISWAP_TEST_1INCH_ROUTER");
 const testWeth = loadEnvVar(process.env.UNISWAP_TEST_WETH, "No UNISWAP_TEST_WETH");
 
+const oneInchApiKey = loadEnvVar(process.env.ONEINCH_API_KEY, "No ONEINCH_API_KEY");
+
 const UINT256_MAX = '0x' + 'f'.repeat(64);
 const UINT64_MAX = '0x' + 'f'.repeat(16);
-
 
 async function setupContracts() {
     // fork a testing environment
@@ -135,6 +136,15 @@ async function main() {
     await prepareLiquidity(owner, manager, user, vault, token0, token1);
 
     console.log("Ratio of tokens:", await helperLib.getVaultTokenRatio(vault));
+
+    helperLib.setAPIKey(oneInchApiKey);
+    // check if 1inch is healthy
+    const network = await vault.provider.getNetwork();
+    const healthy = await helperLib.is1InchHealthy(network.chainId);
+    if (!healthy) {
+        console.log("1Inch network not healthy");
+        return;
+    }
 
     const amount0 = ethers.utils.parseUnits("100", await token0.decimals());
     const amount1 = ethers.utils.parseUnits("1", await token1.decimals());
