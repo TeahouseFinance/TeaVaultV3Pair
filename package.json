@@ -10,7 +10,7 @@
   "keywords": [
     "teavault",
     "core",
-    "v3",
+    "v3"
   ],
   "repository": {
     "type": "git",
@@ -56,5 +56,9 @@
     "@openzeppelin/contracts-upgradeable": "4.8.2",
     "@uniswap/v3-core": "github:Uniswap/v3-core#0.8",
     "@uniswap/v3-periphery": "github:Uniswap/v3-periphery#0.8"
+  },
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test"
   }
 }
