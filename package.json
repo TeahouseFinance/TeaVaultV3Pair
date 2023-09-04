@@ -1,5 +1,32 @@
 {
-  "name": "hardhat-project",
+  "name": "@teahousefinance/teavaultv3pair",
+  "description": "TeaVaultV3Pair core contracts",
+  "license": "BUSL-1.1",
+  "publishConfig": {
+    "access": "public"
+  },
+  "version": "1.0.0",
+  "homepage": "https://teahouse.finance",
+  "keywords": [
+    "teavault",
+    "core",
+    "v3",
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TeahouseFinance/TeaVaultV3Pair"
+  },
+  "files": [
+    "contracts/interfaces",
+    "contracts/libraries",
+    "artifacts/contracts/TeaVaultV3Pair.sol/TeaVaultV3Pair.json",
+    "artifacts/contracts/TeaVaultV3PairHelper.sol/TeaVaultV3PairHelper.json",
+    "artifacts/contracts/interfaces/**/*.json",
+    "!artifacts/contracts/interfaces/**/*.dbg.json"
+  ],
+  "engines": {
+    "node": ">=16"
+  },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.2.2",
     "@nomiclabs/hardhat-etherscan": "^3.1.7",
