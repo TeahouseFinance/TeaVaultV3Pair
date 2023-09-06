@@ -5,7 +5,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "version": "1.0.0",
+  "version": "1.0.2",
   "homepage": "https://teahouse.finance",
   "keywords": [
     "teavault",
@@ -17,9 +17,13 @@
     "url": "https://github.com/TeahouseFinance/TeaVaultV3Pair"
   },
   "files": [
-    "contracts/interfaces",
-    "contracts/libraries",
+    "contracts/TeaVaultV3Pair.sol",
+    "contracts/TeaVaultV3PairHelper.sol",
+    "contracts/interface",
+    "contracts/library",
     "artifacts/contracts/TeaVaultV3Pair.sol/TeaVaultV3Pair.json",
+    "artifacts/contracts/library/VaultUtils.sol/VaultUtils.json",
+    "artifacts/contracts/library/GenericRouter1Inch.sol/GenericRouter1Inch.json",
     "artifacts/contracts/TeaVaultV3PairHelper.sol/TeaVaultV3PairHelper.json",
     "artifacts/contracts/interfaces/**/*.json",
     "!artifacts/contracts/interfaces/**/*.dbg.json"
