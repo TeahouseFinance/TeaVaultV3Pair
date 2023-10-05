@@ -9,6 +9,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+import "@uniswap/v3-core/contracts/libraries/FullMath.sol";
 
 import "./interface/ITeaVaultV3PairHelper.sol";
 import "./interface/IWETH9.sol";
@@ -18,6 +19,7 @@ import "./interface/IWETH9.sol";
 contract TeaVaultV3PairHelper is ITeaVaultV3PairHelper, Ownable {
 
     using SafeERC20 for IERC20;
+    using FullMath for uint256;
 
     IGenericRouter1Inch immutable public router1Inch;
     IWETH9 immutable public weth9;
@@ -116,6 +118,41 @@ contract TeaVaultV3PairHelper is ITeaVaultV3PairHelper, Ownable {
     }
 
     /// @inheritdoc ITeaVaultV3PairHelper
+    function depositMax(
+        uint256 _amount0Max,
+        uint256 _amount1Max
+    ) external payable onlyInMulticall returns (uint256 depositedAmount0, uint256 depositedAmount1) {
+        IERC20 token0 = IERC20(vault.assetToken0());
+        IERC20 token1 = IERC20(vault.assetToken1());        
+        token0.safeApprove(address(vault), type(uint256).max);
+        token1.safeApprove(address(vault), type(uint256).max);
+
+        // estimate share amount
+        (uint256 amount0, uint256 amount1) = vault.vaultAllUnderlyingAssets();
+        uint256 totalShares = IERC20(address(vault)).totalSupply();
+        uint256 balance0 = token0.balanceOf(address(this));
+        uint256 balance1 = token1.balanceOf(address(this));
+        uint256 shares0 = balance0.mulDiv(totalShares, amount0);
+        uint256 shares1 = balance1.mulDiv(totalShares, amount1);
+        uint256 shares = shares0 > shares1 ? shares1 : shares0;
+        // simulate depositing half of the shares
+        (uint256 halfAmount0, uint256 halfAmount1) = simulateDeposit(shares / 2, _amount0Max, _amount1Max);
+
+        // calculate actual share amount and deposit
+        shares0 = balance0.mulDiv(shares / 2, halfAmount0);
+        shares1 = balance1.mulDiv(shares / 2, halfAmount1);
+        shares = shares0 > shares1 ? shares1 : shares0;
+        (depositedAmount0, depositedAmount1) = vault.deposit(shares, _amount0Max, _amount1Max);
+
+        // since vault is specified by the caller, it's safer to remove all allowances after depositing
+        token0.safeApprove(address(vault), 0);
+        token1.safeApprove(address(vault), 0);
+
+        // send the resulting shares to the caller
+        IERC20(address(vault)).safeTransfer(msg.sender, shares);
+    }
+
+    /// @inheritdoc ITeaVaultV3PairHelper
     function withdraw(
         uint256 _shares,
         uint256 _amount0Min,
@@ -202,6 +239,52 @@ contract TeaVaultV3PairHelper is ITeaVaultV3PairHelper, Ownable {
             token.approve(address(router1Inch), type(uint256).max);
         }
         returnAmount = router1Inch.uniswapV3Swap(amount, minReturn, pools);
+    }
+
+    /// @notice Simulate deposit
+    /// @param _shares Share amount to be mint
+    /// @param _amount0Max Max token0 amount to be deposited
+    /// @param _amount1Max Max token1 amount to be deposited
+    /// @return depositedAmount0 Deposited token0 amount
+    /// @return depositedAmount1 Deposited token1 amount
+    function simulateDeposit(uint256 _shares, uint256 _amount0Max, uint256 _amount1Max) internal returns (uint256 depositedAmount0, uint256 depositedAmount1) {
+        (bool success, bytes memory returndata) = address(this).delegatecall(
+            abi.encodeWithSelector(this.simulateDepositInternal.selector, _shares, _amount0Max, _amount1Max));
+        
+        if (success) {
+            // shouldn't happen, revert
+            revert();
+        }
+        else {
+            if (returndata.length == 0) {
+                // no result, revert
+                revert();
+            }
+
+            (depositedAmount0, depositedAmount1) = abi.decode(returndata, (uint256, uint256));
+        }
+    }
+
+    /// @dev Helper function for simulating deposit
+    /// @dev This function always revert, so there's no point calling it directly
+    function simulateDepositInternal(uint256 _shares, uint256 _amount0Max, uint256 _amount1Max) external payable onlyInMulticall {
+        (bool success, bytes memory returndata) = address(vault).call(
+            abi.encodeWithSelector(
+                ITeaVaultV3Pair.deposit.selector,
+                _shares,
+                _amount0Max,
+                _amount1Max
+            )
+        );
+        
+        if (success && returndata.length == 64) {
+            assembly ("memory-safe") {
+                revert(add(returndata, 32), 64)
+            }
+        }
+        else {
+            revert();
+        }
     }
 
     // modifiers

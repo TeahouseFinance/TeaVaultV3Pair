@@ -582,6 +582,58 @@ describe("TeaVaultV3PairHelper", function () {
             expect(token1Before.sub(token1After)).to.equal(amounts.depositedAmount1);
         });
 
+        it("Should be able to deposit with max shares", async function() {
+            const { owner, manager, user, helper, vault, token0, token1 } = await helpers.loadFixture(deployTeaVaultV3PairHelper);
+
+            // set fees
+            const feeConfig = {
+                vault: owner.address,
+                entryFee: 1000,
+                exitFee: 2000,
+                performanceFee: 100000,
+                managementFee: 0,
+            }
+
+            await vault.setFeeConfig(feeConfig);
+
+            // set manager
+            await vault.assignManager(manager.address);
+
+            // deposit
+            await token0.connect(user).approve(vault.address, "10000" + "0".repeat(await token0.decimals()));
+            await token1.connect(user).approve(vault.address, "10000" + "0".repeat(await token1.decimals()));
+            const shares = "100" + "0".repeat(await vault.decimals());
+            await vault.connect(user).deposit(shares, UINT256_MAX, UINT256_MAX);
+
+            // swap
+            await vault.connect(manager).swapInputSingle(
+                true,
+                "50" + "0".repeat(await token0.decimals()),
+                0,
+                0,
+                UINT64_MAX
+            );
+
+            // estimate how much tokens are required
+            const shares2 = "1000" + "0".repeat(await vault.decimals());
+            const amounts = await vault.connect(user).callStatic.deposit(shares2, UINT256_MAX, UINT256_MAX);
+
+            // deposit max shares using helper
+            await token0.connect(user).approve(helper.address, "10000" + "0".repeat(await token0.decimals()));
+            await token1.connect(user).approve(helper.address, "10000" + "0".repeat(await token1.decimals()));
+            const depositData = helper.interface.encodeFunctionData("depositMax", [ UINT256_MAX, UINT256_MAX ]);
+            await helper.connect(user).multicall(
+                vault.address,
+                amounts.depositedAmount0,
+                amounts.depositedAmount1,
+                [ depositData ]
+            );
+            
+            // should have shares minted
+            expect(await vault.balanceOf(user.address))
+            .to.be.closeTo(ethers.BigNumber.from(shares).add(shares2), ethers.BigNumber.from(shares).div(10000));
+        });
+
         if (testToken0 == testWeth || testToken1 == testWeth) {
             it("Should be able to convert to WETH and deposit", async function() {
                 const { owner, manager, user, helper, vault, token0, token1 } = await helpers.loadFixture(deployTeaVaultV3PairHelper);

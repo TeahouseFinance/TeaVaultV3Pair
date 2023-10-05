@@ -7,6 +7,8 @@ const ethers = require('ethers');
 const HARDHAT_NETWORK_CHAINID = 31337;
 const OVERRIDE_CHAINID = 1; // override chainId for forked hardhat network
 
+const UINT256_MAX = '0x' + 'f'.repeat(64);
+
 module.exports = {
     setAPIKey,
     getVaultTokenRatio,
@@ -14,6 +16,7 @@ module.exports = {
     getQuoteFrom1Inch,
     previewDeposit,
     deposit,
+    depositMax,
     previewWithdraw,
     withdraw
 };
@@ -328,6 +331,59 @@ async function deposit(helper, vault, preview, slippage, unwrapWeth = true, amou
 
     // actual deposit
     result.push(helper.interface.encodeFunctionData('deposit', [ sharesMinusSlippage, amount0max, amount1max ]));
+
+    // convert weth9 back to eth if either token0 or token1 is weth9
+    if (unwrapWeth) {
+        const weth9 = await helper.weth9();
+        if (weth9 == token0 || weth9 == token1) {
+            result.push(helper.interface.encodeFunctionData('convertWETH'));
+        }    
+    }
+    
+    return result;
+}
+
+// perform deposit max
+// helper: a TeaVaultV3PairHelper contract object created using ethers.js
+// vault: a TeaVaultV3Pair contract object created using ethers.js
+// preview: a preview object returned by previewDeposit function
+// slppage: allowed slippage for 1Inch exchange swap
+// unwrapWeth: true to unwrap WETH to ETH
+// amount0max: maximum amount of token0 to deposit
+// amount1max: maximum amount of token1 to deposit
+// returns: multicall data for calling the multicall function
+async function depositMax(helper, vault, preview, slippage, unwrapWeth = true, amount0max = undefined, amount1max = undefined) {
+    const network = await vault.provider.getNetwork();
+
+    let result = [];
+
+    const token0 = await vault.assetToken0();
+    const token1 = await vault.assetToken1();
+
+    if (!preview.convertFromAmount.isZero()) {
+        // need to convert something
+        const fromToken = preview.zeroToOne ? token0 : token1;
+        const toToken = preview.zeroToOne ? token1 : token0;
+    
+        const swap = await getSwapFrom1Inch(network.chainId, fromToken, toToken, preview.convertFromAmount, helper.address, slippage, preview.opt);
+        const router1Inch = await helper.router1Inch();
+        if (router1Inch.toLowerCase() != swap.tx.to.toLowerCase()) {
+            throw new Error("1Inch router mismatch");
+        }
+
+        result.push(swap.tx.data);
+    }
+
+    if (amount0max == undefined) {
+        amount0max = UINT256_MAX;
+    }
+
+    if (amount1max == undefined) {
+        amount1max = UINT256_MAX;
+    }
+
+    // actual deposit
+    result.push(helper.interface.encodeFunctionData('depositMax', [ amount0max, amount1max ]));
 
     // convert weth9 back to eth if either token0 or token1 is weth9
     if (unwrapWeth) {

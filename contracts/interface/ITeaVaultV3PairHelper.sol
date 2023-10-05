@@ -44,6 +44,19 @@ interface ITeaVaultV3PairHelper is IGenericRouter1Inch {
         uint256 _amount1Max
     ) external payable returns (uint256 depositedAmount0, uint256 depositedAmount1);
 
+    /// @notice Deposit max possible shares to vault
+    /// @notice Can only be called inside multicall
+    /// @param _amount0Max Max token0 amount to be deposited
+    /// @param _amount1Max Max token1 amount to be deposited
+    /// @return depositedAmount0 Deposited token0 amount
+    /// @return depositedAmount1 Deposited token1 amount
+    /// @dev this function is set to payable because multicall is payable
+    /// @dev otherwise calls to this function fails as solidity requires msg.value to be 0 for non-payable functions
+    function depositMax(
+        uint256 _amount0Max,
+        uint256 _amount1Max
+    ) external payable returns (uint256 depositedAmount0, uint256 depositedAmount1);    
+
     /// @notice Burn shares and withdraw token0 and token1
     /// @notice Can only be called inside multicall
     /// @param _shares Share amount to be burnt

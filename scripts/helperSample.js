@@ -156,7 +156,7 @@ async function main() {
     const preview = await helperLib.previewDeposit(helper, vault, amount0, 0, amount1, opt);
     console.log("previewDeposit:", preview);
 
-    const multicallData = await helperLib.deposit(helper, vault, preview, 0.5);
+    const multicallData = await helperLib.depositMax(helper, vault, preview, 0.5);
     //console.log(multicallData);
 
     // perform multicall
