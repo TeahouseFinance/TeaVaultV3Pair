@@ -28,6 +28,7 @@ const testToken0 = loadEnvVar(process.env.UNISWAP_TEST_TOKEN0, "No UNISWAP_TEST_
 const testToken1 = loadEnvVar(process.env.UNISWAP_TEST_TOKEN1, "No UNISWAP_TEST_TOKEN1");
 const testFeeTier = loadEnvVarInt(process.env.UNISWAP_TEST_FEE_TIER, "No UNISWAP_TEST_FEE_TIER");
 const testDecimalOffset = loadEnvVarInt(process.env.UNISWAP_TEST_DECIMAL_OFFSET, "No UNISWAP_TEST_DECIMAL_OFFSET");
+const testRouter = loadEnvVar(process.env.UNISWAP_TEST_ROUTER, "No UNISWAP_TEST_ROUTER");
 const testToken0Whale = loadEnvVar(process.env.UNISWAP_TEST_TOKEN0_WHALE, "No UNISWAP_TEST_TOKEN0_WHALE");
 const testToken1Whale = loadEnvVar(process.env.UNISWAP_TEST_TOKEN1_WHALE, "No UNISWAP_TEST_TOKEN1_WHALE");
 const test1InchRouter = loadEnvVar(process.env.UNISWAP_TEST_1INCH_ROUTER, "No UNISWAP_TEST_1INCH_ROUTER");
@@ -35,6 +36,10 @@ const testWeth = loadEnvVar(process.env.UNISWAP_TEST_WETH, "No UNISWAP_TEST_WETH
 
 const UINT256_MAX = '0x' + 'f'.repeat(64);
 const UINT64_MAX = '0x' + 'f'.repeat(16);
+
+const UniswapV3SwapRouterABI = [
+    "function exactInputSingle((address,address,uint24,address,uint256,uint256,uint256,uint160)) external payable"
+];
 
 
 async function deployTeaVaultV3Pair() {
@@ -869,6 +874,78 @@ describe("TeaVaultV3PairHelper", function () {
                 + "000000000000000000000000000000000000000000000000000000001dcd6500000000000000000000000000000000000000000000000000037dcd95d600e1d4000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000160000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001360000000000000000000000000000000000000000000001180000ea0000d0512061bb2fda13600c497272a8dd029313afdb125fd3a0b86991c6218b36c1d19d4a2e9eb0ce3606eb480044d5bcb9b5000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb4800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000037dcd95d600e1d400000000000000000000000042f527f50f16a103b6ccab48bccca214500c10214041c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2d0e30db080a06c4eca27c02aaa39b223fe8d0a0e5c4f27ead9083c756cc21111111254eeb25477b68fb85ed929f73a96058200000000000000000000cfee7c08";
 
             const amount0 = "1010" + "0".repeat(await token0.decimals());
+            await token0.connect(user).approve(helper.address, "10000" + "0".repeat(await token0.decimals()));
+            const depositData = helper.interface.encodeFunctionData("deposit", [ shares2, UINT256_MAX, UINT256_MAX ]);
+
+            await helper.connect(user).multicall(
+                vault.address,
+                amount0,
+                0,
+                [ swapData, depositData ]
+            );
+            
+            // should have shares minted
+            expect(await vault.balanceOf(user.address)).to.equal(ethers.BigNumber.from(shares).add(shares2));
+        });
+
+        it("Should be able to swap using genericSwap and deposit", async function() {
+            const { owner, manager, user, helper, vault, token0, token1 } = await helpers.loadFixture(deployTeaVaultV3PairHelper);
+
+            // set fees
+            const feeConfig = {
+                vault: owner.address,
+                entryFee: 1000,
+                exitFee: 2000,
+                performanceFee: 100000,
+                managementFee: 0,
+            }
+
+            await vault.setFeeConfig(feeConfig);
+
+            // set manager
+            await vault.assignManager(manager.address);
+
+            // deposit
+            await token0.connect(user).approve(vault.address, "10000" + "0".repeat(await token0.decimals()));
+            await token1.connect(user).approve(vault.address, "10000" + "0".repeat(await token1.decimals()));
+            const shares = "100" + "0".repeat(await vault.decimals());
+            await vault.connect(user).deposit(shares, UINT256_MAX, UINT256_MAX);
+
+            // swap
+            await vault.connect(manager).swapInputSingle(
+                true,
+                "50" + "0".repeat(await token0.decimals()),
+                0,
+                0,
+                UINT64_MAX
+            );
+
+            // swap and deposit using helper
+            const shares2 = "990" + "0".repeat(await vault.decimals());
+            const amount0 = "1010" + "0".repeat(await token0.decimals());
+            const swapAmount = ethers.BigNumber.from(amount0).div(2);
+            const v3Router = new ethers.Contract(testRouter, UniswapV3SwapRouterABI);
+            const uniswapV3SwapData = v3Router.interface.encodeFunctionData("exactInputSingle", [
+                [ 
+                    token0.address,
+                    token1.address,
+                    500,
+                    helper.address,
+                    UINT64_MAX,
+                    swapAmount,
+                    "0",
+                    "0"
+                ]
+            ]);
+            const swapData = helper.interface.encodeFunctionData("genericSwap", [
+                token0.address,
+                token1.address,
+                swapAmount,
+                0,
+                testRouter,
+                uniswapV3SwapData
+            ]);
+
             await token0.connect(user).approve(helper.address, "10000" + "0".repeat(await token0.decimals()));
             const depositData = helper.interface.encodeFunctionData("deposit", [ shares2, UINT256_MAX, UINT256_MAX ]);
 

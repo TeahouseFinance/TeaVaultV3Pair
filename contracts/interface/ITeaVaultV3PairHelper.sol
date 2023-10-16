@@ -12,6 +12,8 @@ interface ITeaVaultV3PairHelper is IGenericRouter1Inch {
     error OnlyInMulticall();
     error NotWETH9Vault();
     error InvalidSwapReceiver();
+    error ExecuteSwapFailed(bytes reason);
+    error InsufficientSwapResult(uint256 minAmount, uint256 convertedAmount);
 
     /// @notice Multicall
     /// @notice This function converts all msg.value into WETH9, and transfer required token amounts from the caller to the contract,
@@ -71,6 +73,15 @@ interface ITeaVaultV3PairHelper is IGenericRouter1Inch {
         uint256 _amount0Min,
         uint256 _amount1Min
     ) external payable returns (uint256 withdrawnAmount0, uint256 withdrawnAmount1);
+
+    function genericSwap(
+        address _srcToken,
+        address _dstToken,
+        uint256 _amountInMax,
+        uint256 _amountOutMin,
+        address _swapRouter,
+        bytes calldata _data
+    ) external payable returns (uint256 convertedAmount);
 
     /// @notice Convert all WETH9 back to ETH
     /// @notice Can only be called inside multicall

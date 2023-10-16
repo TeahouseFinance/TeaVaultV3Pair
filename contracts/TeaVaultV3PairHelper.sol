@@ -241,6 +241,25 @@ contract TeaVaultV3PairHelper is ITeaVaultV3PairHelper, Ownable {
         returnAmount = router1Inch.uniswapV3Swap(amount, minReturn, pools);
     }
 
+    /// @inheritdoc ITeaVaultV3PairHelper
+    function genericSwap(
+        address _srcToken,
+        address _dstToken,
+        uint256 _amountInMax,
+        uint256 _amountOutMin,
+        address _swapRouter,
+        bytes calldata _data
+    ) external payable onlyInMulticall returns (uint256 convertedAmount) {
+        IERC20(_srcToken).approve(_swapRouter, _amountInMax);
+        uint256 dstTokenBalanceBefore = IERC20(_dstToken).balanceOf(address(this));
+        (bool success, bytes memory result) = _swapRouter.call(_data);
+        if (!success) revert ExecuteSwapFailed(result);
+        uint256 dstTokenBalanceAfter = IERC20(_dstToken).balanceOf(address(this));
+        convertedAmount = dstTokenBalanceAfter - dstTokenBalanceBefore;
+        if (convertedAmount < _amountOutMin) revert InsufficientSwapResult(_amountOutMin, convertedAmount);
+        IERC20(_srcToken).approve(_swapRouter, 0);
+    }
+
     /// @notice Simulate deposit
     /// @param _shares Share amount to be mint
     /// @param _amount0Max Max token0 amount to be deposited
