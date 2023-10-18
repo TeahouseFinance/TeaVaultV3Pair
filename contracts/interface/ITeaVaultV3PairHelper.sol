@@ -74,6 +74,17 @@ interface ITeaVaultV3PairHelper is IGenericRouter1Inch {
         uint256 _amount1Min
     ) external payable returns (uint256 withdrawnAmount0, uint256 withdrawnAmount1);
 
+    /// @notice Swap assets via swap router
+    /// @notice Can only be called inside multicall
+    /// @param _srcToken Source token
+    /// @param _dstToken Destination token
+    /// @param _amountInMax Max amount of source token to swap
+    /// @param _amountOutMin Min amount of destination tokens to receive
+    /// @param _swapRouter swap router
+    /// @param _data Call data of swap router
+    /// @return convertedAmount Swap output amount
+    /// @dev this function is set to payable because multicall is payable
+    /// @dev otherwise calls to this function fails as solidity requires msg.value to be 0 for non-payable functions
     function genericSwap(
         address _srcToken,
         address _dstToken,
