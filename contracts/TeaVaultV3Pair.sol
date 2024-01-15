@@ -141,6 +141,8 @@ contract TeaVaultV3Pair is
 
     /// @inheritdoc ITeaVaultV3Pair
     function setFeeConfig(FeeConfig calldata _feeConfig) external override onlyOwner {
+        _collectManagementFee();
+        _collectAllSwapFee();
         _setFeeConfig(_feeConfig);
     }
 
