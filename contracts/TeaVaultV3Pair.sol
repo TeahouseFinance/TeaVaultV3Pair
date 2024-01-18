@@ -200,8 +200,8 @@ contract TeaVaultV3Pair is
         uint256 _amount1Max
     ) external override nonReentrant returns (uint256 depositedAmount0, uint256 depositedAmount1) {
         if (_shares == 0) revert InvalidShareAmount();
-        uint256 totalShares = totalSupply();
         _collectManagementFee();
+        uint256 totalShares = totalSupply();
 
         if (totalShares == 0) {
             // vault is empty, default to 1:1 share to token0 ratio (offseted by _decimalOffset)
@@ -275,8 +275,8 @@ contract TeaVaultV3Pair is
         uint256 _amount1Min
     ) external override nonReentrant returns (uint256 withdrawnAmount0, uint256 withdrawnAmount1) {
         if (_shares == 0) revert InvalidShareAmount();
-        uint256 totalShares = totalSupply();
         _collectManagementFee();
+        uint256 totalShares = totalSupply();
 
         // collect exit fee for users
         // do not collect exit fee for fee recipient
