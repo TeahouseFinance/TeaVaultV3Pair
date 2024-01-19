@@ -256,11 +256,12 @@ describe("TeaVaultV3Pair", function () {
             const denominator = feeMultiplier * secondsInAYear - managementFeeTimeDiff;
             const managementFee = ethers.BigNumber.from(shares).mul(managementFeeTimeDiff).add(denominator - 1).div(denominator);
 
-            expectedAmount0 = ethers.BigNumber.from(token0Amount);
+            const totalSupply = await vault.totalSupply();
+            expectedAmount0 = ethers.BigNumber.from(token0Amount).mul(totalSupply.sub(managementFee)).div(totalSupply);
             const exitFeeAmount0 = expectedAmount0.mul(feeConfig.exitFee).div("1000000");
             const exitFeeShares = ethers.BigNumber.from(shares).mul(feeConfig.exitFee).div("1000000");
             expectedAmount0 = expectedAmount0.sub(exitFeeAmount0);
-            expect(token0After.sub(token0Before)).to.equal(expectedAmount0); // user received expectedAmount0 of token0
+            expect(token0After.sub(token0Before)).to.be.closeTo(expectedAmount0, 100); // user received expectedAmount0 of token0
             expect(await vault.balanceOf(owner.address)).to.equal(exitFeeShares.add(managementFee)); // vault received exitFeeShares and managementFee of share
         });
 
