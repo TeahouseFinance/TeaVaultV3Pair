@@ -35,41 +35,44 @@ const performanceFee = loadEnvVarInt(process.env.PPERFORMANCE_FEE, "No PPERFORMA
 const managementFee = loadEnvVarInt(process.env.MANAGEMENT_FEE, "No MANAGEMENT_FEE");
 const oneInchRouter = loadEnvVar(process.env.ROUTER_1INCH_V5, "No ROUTER_1INCH_V5");
 const manager = loadEnvVar(process.env.MANAGER, "No MANAGER");
+const rewardClaimer = loadEnvVar(process.env.REWARD_CLAIMER, "No REWARD_CLAIMER");
 
 async function main() {
-    // const [deployer] = await ethers.getSigners();
+    const [deployer] = await ethers.getSigners();
 
     // deploy TeaVaultV3Pair
     const VaultUtils = await ethers.getContractFactory("VaultUtils");
     const vaultUtils = await VaultUtils.deploy();
+    console.log("VaultUtils deployed", vaultUtils.target);
 
     const GenericRouter1Inch = await ethers.getContractFactory("GenericRouter1Inch");
     const genericRouter1Inch = await GenericRouter1Inch.deploy();
+    console.log("GenericRouter1Inch deployed", genericRouter1Inch.target);
 
     const TeaVaultV3Pair = await ethers.getContractFactory("TeaVaultV3Pair", {
         libraries: {
-            VaultUtils: vaultUtils.address,
-            GenericRouter1Inch: genericRouter1Inch.address,
+            VaultUtils: vaultUtils.target,
+            GenericRouter1Inch: genericRouter1Inch.target,
         },
     });
 
     const vault = await upgrades.deployProxy(
         TeaVaultV3Pair,
-        [name, symbol, factory, token0, token1, feeTier, decimalOffset, feeCap, [feeVault, entryFee, exitFee, performanceFee, managementFee], owner],
+        [name, symbol, factory, token0, token1, feeTier, decimalOffset, feeCap, [feeVault, entryFee, exitFee, performanceFee, managementFee], deployer.address, rewardClaimer],
         {
             kind: "uups",
             unsafeAllowLinkedLibraries: true,
             unsafeAllow: ["delegatecall"],
         }
     );
-    console.log("VaultUtils deployed", vaultUtils.address);
-    console.log("GenericRouter1Inch deployed", genericRouter1Inch.address);
     console.log("Vault depolyed", vault.address);
 
     await vault.assignManager(manager);
+    console.log("Manager set!");
     await vault.assignRouter1Inch(oneInchRouter);
+    console.log("1inchRouter set!");
     await vault.transferOwnership(owner);
-    console.log("manager and 1inchRouter set!");
+    console.log("Ownership transfered!");
 }
 
 main().catch((error) => {

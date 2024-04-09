@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Teahouse Finance
 
-pragma solidity =0.8.19;
+pragma solidity =0.8.25;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/math/SafeCastUpgradeable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 
 import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
 import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
@@ -33,9 +34,9 @@ contract TeaVaultV3Pair is
     ReentrancyGuardUpgradeable,
     ERC20Upgradeable
 {
-    using SafeERC20Upgradeable for ERC20Upgradeable;
+    using SafeERC20 for ERC20Upgradeable;
     using FullMath for uint256;
-    using SafeCastUpgradeable for uint256;
+    using SafeCast for uint256;
 
     uint256 public SECONDS_IN_A_YEAR;
     uint256 public DECIMALS_MULTIPLIER;
@@ -57,6 +58,8 @@ contract TeaVaultV3Pair is
     IGenericRouter1Inch public router1Inch;
     uint256 public FEE_CAP;
 
+    address public rewardClaimer;
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers(); // prevent attackers from using implementation contracts (audit ID:4)
@@ -72,10 +75,11 @@ contract TeaVaultV3Pair is
         uint8 _decimalOffset,
         uint24 _feeCap,
         FeeConfig calldata _feeConfig,
-        address _owner
+        address _owner,
+        address _rewardClaimer
     ) public initializer {
         __UUPSUpgradeable_init();
-        __Ownable_init();
+        __Ownable_init(_owner);
         __ReentrancyGuard_init();
         __ERC20_init(_name, _symbol);
 
@@ -100,10 +104,10 @@ contract TeaVaultV3Pair is
 
         // set a hardcap on fee configuration (audit ID:3)
         if (_feeCap >= FEE_MULTIPLIER) revert InvalidFeeCap();
-        FEE_CAP = _feeCap; 
+        FEE_CAP = _feeCap;
+        rewardClaimer = _rewardClaimer;
         
         _setFeeConfig(_feeConfig); // set initial fee config (audit ID:2)
-        transferOwnership(_owner); // To enhance security, we recommend using a multi-sig account for _owner (audit ID:3)
 
         emit TeaVaultV3PairCreated(address(this));
     }
@@ -616,7 +620,7 @@ contract TeaVaultV3Pair is
         results = new bytes[](data.length);
         for (uint256 i; i < data.length; i++) {
             (bool success, bytes memory returndata) = address(this).delegatecall(data[i]);
-            results[i] = AddressUpgradeable.verifyCallResult(success, returndata, "Address: low-level delegate call failed");
+            results[i] = Address.verifyCallResult(success, returndata);
         }
         return results;
     }
@@ -734,8 +738,8 @@ contract TeaVaultV3Pair is
         uint256 minAmount = simulateSwapInputSingle(srcToken == address(token0), inputAmount);
         return GenericRouter1Inch.clipperSwap(
             router1Inch,
-            IERC20Upgradeable(token0),
-            IERC20Upgradeable(token1),
+            IERC20(token0),
+            IERC20(token1),
             minAmount,
             clipperExchange,
             srcToken,
@@ -768,8 +772,8 @@ contract TeaVaultV3Pair is
         uint256 minAmount = simulateSwapInputSingle(desc.srcToken == address(token0), desc.amount);
         return GenericRouter1Inch.swap(
             router1Inch,
-            IERC20Upgradeable(token0),
-            IERC20Upgradeable(token1),
+            IERC20(token0),
+            IERC20(token1),
             minAmount,
             executor,
             desc,
@@ -796,8 +800,8 @@ contract TeaVaultV3Pair is
         uint256 minAmount = simulateSwapInputSingle(srcToken == address(token0), amount);
         return GenericRouter1Inch.unoswap(
             router1Inch,
-            IERC20Upgradeable(token0),
-            IERC20Upgradeable(token1),
+            IERC20(token0),
+            IERC20(token1),
             minAmount,
             srcToken,
             amount,
@@ -828,8 +832,8 @@ contract TeaVaultV3Pair is
         uint256 minAmount = simulateSwapInputSingle(srcToken == address(token0), amount);
         return GenericRouter1Inch.uniswapV3Swap(
             router1Inch,
-            IERC20Upgradeable(token0),
-            IERC20Upgradeable(token1),
+            IERC20(token0),
+            IERC20(token1),
             srcToken == address(token0),
             minAmount,
             amount,
@@ -886,6 +890,23 @@ contract TeaVaultV3Pair is
         }
         else {
             revert();
+        }
+    }
+
+    function setRewardClaimer(address _rewardClaimer) external onlyOwner {
+        rewardClaimer = _rewardClaimer;
+    }
+
+    function withdrawRewards(ERC20Upgradeable[] calldata _tokens, address _to) external nonReentrant {
+        if (msg.sender != rewardClaimer) revert();
+
+        ERC20Upgradeable _token0 = token0;
+        ERC20Upgradeable _token1 = token1;
+
+        for (uint256 i; i < _tokens.length; i = i + 1) {
+            if (_tokens[i] != _token0 && _tokens[i] != _token1) {
+                _tokens[i].safeTransfer(_to, _tokens[i].balanceOf(address(this)));
+            }
         }
     }
 

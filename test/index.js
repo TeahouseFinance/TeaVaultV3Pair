@@ -47,7 +47,7 @@ async function deployTeaVaultV3Pair() {
     await helpers.reset(testRpc, testBlock);
 
     // Contracts are deployed using the first signer/account by default
-    const [owner, manager, user] = await ethers.getSigners();
+    const [owner, manager, claimer, user] = await ethers.getSigners();
 
     // get ERC20 tokens
     const MockToken = await ethers.getContractFactory("MockToken");
@@ -57,13 +57,13 @@ async function deployTeaVaultV3Pair() {
     // get tokens from whale
     await helpers.impersonateAccount(testToken0Whale);
     const token0Whale = await ethers.getSigner(testToken0Whale);
-    await helpers.setBalance(token0Whale.address, ethers.utils.parseEther("100"));  // assign some eth to the whale in case it's a contract and not accepting eth
-    await token0.connect(token0Whale).transfer(user.address, "100000" + '0'.repeat(await token0.decimals()));
+    await helpers.setBalance(token0Whale.address, ethers.parseEther("100"));  // assign some eth to the whale in case it's a contract and not accepting eth
+    await token0.connect(token0Whale).transfer(user.address, ethers.parseUnits("100000", await token0.decimals()));
 
     await helpers.impersonateAccount(testToken1Whale);
     const token1Whale = await ethers.getSigner(testToken1Whale);
-    await helpers.setBalance(token1Whale.address, ethers.utils.parseEther("100"));  // assign some eth to the whale in case it's a contract and not accepting eth
-    await token1.connect(token1Whale).transfer(user.address, "100000" + '0'.repeat(await token1.decimals()));
+    await helpers.setBalance(token1Whale.address, ethers.parseEther("100"));  // assign some eth to the whale in case it's a contract and not accepting eth
+    await token1.connect(token1Whale).transfer(user.address, ethers.parseUnits("100000", await token1.decimals()));
 
     // deploy TeaVaultV3Pair
     const VaultUtils = await ethers.getContractFactory("VaultUtils");
@@ -74,8 +74,8 @@ async function deployTeaVaultV3Pair() {
 
     const TeaVaultV3Pair = await ethers.getContractFactory("TeaVaultV3Pair", {
         libraries: {
-            VaultUtils: vaultUtils.address,
-            GenericRouter1Inch: genericRouter1Inch.address,
+            VaultUtils: vaultUtils.target,
+            GenericRouter1Inch: genericRouter1Inch.target,
         },
     });
 
@@ -88,7 +88,7 @@ async function deployTeaVaultV3Pair() {
         managementFee: 0,
     };
     const vault = await upgrades.deployProxy(TeaVaultV3Pair,
-        [ "Test Vault", "TVault", testFactory, token0.address, token1.address, testFeeTier, testDecimalOffset, feeCap, feeConfig, owner.address, ],
+        [ "Test Vault", "TVault", testFactory, token0.target, token1.target, testFeeTier, testDecimalOffset, feeCap, feeConfig, owner.address, claimer.address],
         { 
             kind: "uups", 
             unsafeAllowLinkedLibraries: true, 
@@ -115,15 +115,15 @@ describe("TeaVaultV3Pair", function () {
         it("Should set the correct tokens", async function () {
             const { vault, token0, token1 } = await helpers.loadFixture(deployTeaVaultV3Pair);
 
-            expect(await vault.assetToken0()).to.equal(token0.address);
-            expect(await vault.assetToken1()).to.equal(token1.address);
+            expect(await vault.assetToken0()).to.equal(token0.target);
+            expect(await vault.assetToken1()).to.equal(token1.target);
         });
 
         it("Should set the correct decimals", async function () {
             const { vault, token0 } = await helpers.loadFixture(deployTeaVaultV3Pair);
 
             const token0Decimals = await token0.decimals();
-            expect(await vault.decimals()).to.equal(token0Decimals + testDecimalOffset);
+            expect(await vault.decimals()).to.equal(token0Decimals + BigInt(testDecimalOffset));
         });
     });
 

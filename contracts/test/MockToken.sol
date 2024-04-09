@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Unlicensed
 // Mock ERC20 contract for testing purpose
 
-pragma solidity =0.8.19;
+pragma solidity =0.8.25;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 

@@ -37,6 +37,7 @@ const performanceFee = loadEnvVarInt(process.env.PPERFORMANCE_FEE, "No PPERFORMA
 const managementFee = loadEnvVarInt(process.env.MANAGEMENT_FEE, "No MANAGEMENT_FEE");
 const oneInchRouter = loadEnvVar(process.env.ROUTER_1INCH_V5, "No ROUTER_1INCH_V5");
 const manager = loadEnvVar(process.env.MANAGER, "No MANAGER");
+const rewardClaimer = loadEnvVar(process.env.REWARD_CLAIMER, "No REWARD_CLAIMER");
 
 async function main() {
     const [deployer] = await ethers.getSigners();
@@ -49,22 +50,23 @@ async function main() {
 
     const vault = await upgrades.deployProxy(
         TeaVaultV3Pair,
-        [name, symbol, factory, token0, token1, feeTier, decimalOffset, feeCap, [feeVault, entryFee, exitFee, performanceFee, managementFee], deployer.address],
+        [name, symbol, factory, token0, token1, feeTier, decimalOffset, feeCap, [feeVault, entryFee, exitFee, performanceFee, managementFee], deployer.address, rewardClaimer],
         {
             kind: "uups",
             unsafeAllowLinkedLibraries: true,
             unsafeAllow: ["delegatecall"],
         }
     );
-
     console.log("VaultUtils used", vaultUtils);
     console.log("GenericRouter1Inch used", genericRouter1Inch);
-    console.log("Vault depolyed", vault.address);
+    console.log("Vault depolyed", vault.target);
 
-    await vault.assignManager(manager);
-    await vault.assignRouter1Inch(oneInchRouter);
-    await vault.transferOwnership(owner);
-    console.log("manager and 1inchRouter set!");
+    await vault.assignManager(manager, {gasLimit: 1000000n});
+    console.log("Manager set!");
+    await vault.assignRouter1Inch(oneInchRouter, {gasLimit: 1000000n});
+    console.log("1inchRouter set!");
+    await vault.transferOwnership(owner, {gasLimit: 1000000n});
+    console.log("Ownership transfered!");
 }
 
 main().catch((error) => {

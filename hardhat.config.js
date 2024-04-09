@@ -1,7 +1,6 @@
 require("dotenv").config();
 
-require("@nomiclabs/hardhat-etherscan");
-require("@nomiclabs/hardhat-waffle");
+require("@nomicfoundation/hardhat-verify");
 require("hardhat-gas-reporter");
 require("solidity-coverage");
 require("hardhat-contract-sizer");
@@ -25,12 +24,12 @@ task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
  */
 module.exports = {
     solidity: {
-        version: "0.8.19",
+        version: "0.8.25",
         settings: {
             viaIR: true,
             optimizer: {
                 enabled: true,
-                runs: 15,
+                runs: 200,
             },
             // debug: {
             //     revertStrings: "strip",
@@ -61,28 +60,50 @@ module.exports = {
             url: process.env.TT_URL || "",
             accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
         },
+        poly: {
+            url: process.env.POLY_URL || "",
+            accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+        },
         mumbai: {
             url: process.env.MUMBAI_URL || "",
-            accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
-        },
-        polygon: {
-            url: process.env.POLYGON_URL || "",
-            accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
-        },
-        mantle: {
-            url: process.env.MANTLE_URL || "",
             accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
         },
         boba: {
             url: process.env.BOBA_URL || "",
             accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
         },
+        scroll: {
+            url: process.env.SCROLL_URL || "",
+            accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+            gasPrice: 1500000000
+        },
     },
     gasReporter: {
         enabled: process.env.REPORT_GAS !== undefined,
         currency: "USD",
     },
+    sourcify: {
+        enabled: false
+    },
     etherscan: {
         apiKey: process.env.ETHERSCAN_API_KEY,
-    },
+        customChains: [
+            {
+                network: "boba",
+                chainId: 288,
+                urls: {
+                    apiURL: "https://api.bobascan.com/api",
+                    browserURL: "https://bobascan.com"
+                }
+            },
+            {
+                network: "scroll",
+                chainId: 534352,
+                urls: {
+                    apiURL: "https://api.scrollscan.com/api",
+                    browserURL: "https://scrollscan.com/"
+                }
+            }
+        ]
+    }
 };

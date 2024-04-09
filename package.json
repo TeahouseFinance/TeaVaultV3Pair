@@ -1,68 +1,16 @@
 {
-  "name": "@teahousefinance/teavaultv3pair",
-  "description": "TeaVaultV3Pair core contracts",
-  "license": "BUSL-1.1",
-  "publishConfig": {
-    "access": "public"
-  },
-  "version": "1.0.3",
-  "homepage": "https://teahouse.finance",
-  "keywords": [
-    "teavault",
-    "core",
-    "v3"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/TeahouseFinance/TeaVaultV3Pair"
-  },
-  "files": [
-    "contracts/TeaVaultV3Pair.sol",
-    "contracts/TeaVaultV3PairHelper.sol",
-    "contracts/interface",
-    "contracts/library",
-    "artifacts/contracts/TeaVaultV3Pair.sol/TeaVaultV3Pair.json",
-    "artifacts/contracts/library/VaultUtils.sol/VaultUtils.json",
-    "artifacts/contracts/library/GenericRouter1Inch.sol/GenericRouter1Inch.json",
-    "artifacts/contracts/TeaVaultV3PairHelper.sol/TeaVaultV3PairHelper.json",
-    "artifacts/contracts/interfaces/**/*.json",
-    "!artifacts/contracts/interfaces/**/*.dbg.json"
-  ],
-  "engines": {
-    "node": ">=16"
-  },
+  "name": "hardhat-project",
   "devDependencies": {
-    "@nomiclabs/hardhat-ethers": "^2.2.2",
-    "@nomiclabs/hardhat-etherscan": "^3.1.7",
-    "@nomiclabs/hardhat-waffle": "^2.0.5",
-    "@openzeppelin/hardhat-upgrades": "^1.22.1",
-    "chai": "^4.3.7",
-    "dotenv": "^10.0.0",
-    "eslint": "^7.32.0",
-    "eslint-config-prettier": "^8.8.0",
-    "eslint-config-standard": "^16.0.3",
-    "eslint-plugin-import": "^2.27.5",
-    "eslint-plugin-node": "^11.1.0",
-    "eslint-plugin-prettier": "^3.4.1",
-    "eslint-plugin-promise": "^5.2.0",
-    "ethereum-waffle": "^3.4.4",
-    "ethers": "^5.7.2",
-    "hardhat": "^2.13.0",
-    "hardhat-contract-sizer": "^2.8.0",
-    "hardhat-gas-reporter": "^1.0.9",
-    "prettier": "^2.8.6",
-    "prettier-plugin-solidity": "^1.1.3",
-    "solhint": "^3.4.1",
-    "solidity-coverage": "^0.7.22"
-  },
-  "dependencies": {
-    "@nomicfoundation/hardhat-network-helpers": "^1.0.8",
-    "@openzeppelin/contracts-upgradeable": "4.8.2",
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.10",
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@nomicfoundation/hardhat-verify": "^2.0.5",
+    "@openzeppelin/contracts": "^5.0.2",
+    "@openzeppelin/contracts-upgradeable": "^5.0.2",
+    "@openzeppelin/hardhat-upgrades": "^3.0.5",
     "@uniswap/v3-core": "github:Uniswap/v3-core#0.8",
-    "@uniswap/v3-periphery": "github:Uniswap/v3-periphery#0.8"
-  },
-  "scripts": {
-    "compile": "hardhat compile",
-    "test": "hardhat test"
+    "@uniswap/v3-periphery": "github:Uniswap/v3-periphery#0.8",
+    "dotenv": "^16.4.5",
+    "hardhat": "^2.22.2",
+    "hardhat-contract-sizer": "^2.10.0"
   }
 }

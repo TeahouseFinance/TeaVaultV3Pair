@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Teahouse Finance
 
-pragma solidity =0.8.19;
+pragma solidity =0.8.25;
 
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -26,7 +26,7 @@ contract TeaVaultV3PairHelper is ITeaVaultV3PairHelper, Ownable {
 
     ITeaVaultV3Pair private vault;
 
-    constructor(address _router1Inch, address _weth9) {
+    constructor(address _router1Inch, address _weth9) Ownable(msg.sender) {
         router1Inch = IGenericRouter1Inch(_router1Inch);
         weth9 = IWETH9(_weth9);
         
@@ -75,7 +75,7 @@ contract TeaVaultV3PairHelper is ITeaVaultV3PairHelper, Ownable {
         results = new bytes[](_data.length);
         for (uint256 i = 0; i < _data.length; i++) {
             (bool success, bytes memory returndata) = address(this).delegatecall(_data[i]);
-            results[i] = Address.verifyCallResult(success, returndata, "Address: low-level delegate call failed");
+            results[i] = Address.verifyCallResult(success, returndata);
         }
 
         // refund all balances
@@ -105,13 +105,13 @@ contract TeaVaultV3PairHelper is ITeaVaultV3PairHelper, Ownable {
     ) external payable onlyInMulticall returns (uint256 depositedAmount0, uint256 depositedAmount1) {
         IERC20 token0 = IERC20(vault.assetToken0());
         IERC20 token1 = IERC20(vault.assetToken1());        
-        token0.safeApprove(address(vault), type(uint256).max);
-        token1.safeApprove(address(vault), type(uint256).max);
+        token0.forceApprove(address(vault), type(uint256).max);
+        token1.forceApprove(address(vault), type(uint256).max);
         (depositedAmount0, depositedAmount1) = vault.deposit(_shares, _amount0Max, _amount1Max);
 
         // since vault is specified by the caller, it's safer to remove all allowances after depositing
-        token0.safeApprove(address(vault), 0);
-        token1.safeApprove(address(vault), 0);
+        token0.forceApprove(address(vault), 0);
+        token1.forceApprove(address(vault), 0);
 
         // send the resulting shares to the caller
         IERC20(address(vault)).safeTransfer(msg.sender, _shares);
@@ -124,8 +124,8 @@ contract TeaVaultV3PairHelper is ITeaVaultV3PairHelper, Ownable {
     ) external payable onlyInMulticall returns (uint256 depositedAmount0, uint256 depositedAmount1) {
         IERC20 token0 = IERC20(vault.assetToken0());
         IERC20 token1 = IERC20(vault.assetToken1());        
-        token0.safeApprove(address(vault), type(uint256).max);
-        token1.safeApprove(address(vault), type(uint256).max);
+        token0.forceApprove(address(vault), type(uint256).max);
+        token1.forceApprove(address(vault), type(uint256).max);
 
         // estimate share amount
         (uint256 amount0, uint256 amount1) = vault.vaultAllUnderlyingAssets();
@@ -145,8 +145,8 @@ contract TeaVaultV3PairHelper is ITeaVaultV3PairHelper, Ownable {
         (depositedAmount0, depositedAmount1) = vault.deposit(shares, _amount0Max, _amount1Max);
 
         // since vault is specified by the caller, it's safer to remove all allowances after depositing
-        token0.safeApprove(address(vault), 0);
-        token1.safeApprove(address(vault), 0);
+        token0.forceApprove(address(vault), 0);
+        token1.forceApprove(address(vault), 0);
 
         // send the resulting shares to the caller
         IERC20(address(vault)).safeTransfer(msg.sender, shares);

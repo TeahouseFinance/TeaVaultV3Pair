@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Teahouse Finance
-pragma solidity ^0.8.0;
+pragma solidity =0.8.25;
 
 import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import "@uniswap/v3-core/contracts/libraries/TickMath.sol";

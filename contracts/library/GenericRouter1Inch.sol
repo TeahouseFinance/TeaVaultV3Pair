@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Teahouse Finance
 
-pragma solidity =0.8.19;
+pragma solidity =0.8.25;
 
-import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "../interface/ITeaVaultV3Pair.sol";
 import "../interface/IGenericRouter1Inch.sol";
 
 library GenericRouter1Inch {
 
-    using SafeERC20Upgradeable for IERC20Upgradeable;
+    using SafeERC20 for IERC20;
 
     /// @notice swap tokens using 1Inch router via ClipperRouter
     /// @param srcToken Source token
@@ -24,8 +24,8 @@ library GenericRouter1Inch {
     /// @return returnAmount Amount of destination tokens received
     function clipperSwap(
         IGenericRouter1Inch router1Inch,
-        IERC20Upgradeable token0,
-        IERC20Upgradeable token1,
+        IERC20 token0,
+        IERC20 token1,
         uint256 minAmount,
         address clipperExchange,
         address srcToken,
@@ -38,7 +38,7 @@ library GenericRouter1Inch {
     ) external returns(uint256 returnAmount) {
         if (srcToken == address(token0)) {
             // perform actual swap
-            token0.safeApprove(address(router1Inch), inputAmount);
+            token0.forceApprove(address(router1Inch), inputAmount);
             uint256 token1BalanceBefore = token1.balanceOf(address(this));
             returnAmount = router1Inch.clipperSwap(clipperExchange, srcToken, dstToken, inputAmount, outputAmount, goodUntil, r, vs);
             uint256 token1BalanceAfter = token1.balanceOf(address(this));
@@ -49,7 +49,7 @@ library GenericRouter1Inch {
         }
         else {
             // perform actual swap
-            token1.safeApprove(address(router1Inch), inputAmount);
+            token1.forceApprove(address(router1Inch), inputAmount);
             uint256 token0BalanceBefore = token0.balanceOf(address(this));
             returnAmount = router1Inch.clipperSwap(clipperExchange, srcToken, dstToken, inputAmount, outputAmount, goodUntil, r, vs);
             uint256 token0BalanceAfter = token0.balanceOf(address(this));
@@ -69,8 +69,8 @@ library GenericRouter1Inch {
     /// @return spentAmount Source token amount        
     function swap(
         IGenericRouter1Inch router1Inch,
-        IERC20Upgradeable token0,
-        IERC20Upgradeable token1,
+        IERC20 token0,
+        IERC20 token1,
         uint256 minAmount,
         address executor,
         IGenericRouter1Inch.SwapDescription calldata desc,
@@ -79,7 +79,7 @@ library GenericRouter1Inch {
     ) external returns (uint256 returnAmount, uint256 spentAmount) {
         if (desc.srcToken == address(token0)) {
             // perform actual swap
-            token0.safeApprove(address(router1Inch), desc.amount);
+            token0.forceApprove(address(router1Inch), desc.amount);
             uint256 token1BalanceBefore = token1.balanceOf(address(this));
             (returnAmount, spentAmount) = router1Inch.swap(executor, desc, permit, data);
             uint256 token1BalanceAfter = token1.balanceOf(address(this));
@@ -90,7 +90,7 @@ library GenericRouter1Inch {
         }
         else {
             // perform actual swap
-            token1.safeApprove(address(router1Inch), desc.amount);
+            token1.forceApprove(address(router1Inch), desc.amount);
             uint256 token0BalanceBefore = token0.balanceOf(address(this));
             (returnAmount, spentAmount) = router1Inch.swap(executor, desc, permit, data);
             uint256 token0BalanceAfter = token0.balanceOf(address(this));
@@ -108,8 +108,8 @@ library GenericRouter1Inch {
     /// @param pools Pools chain used for swaps. Pools src and dst tokens should match to make swap happen
     function unoswap(
         IGenericRouter1Inch router1Inch,
-        IERC20Upgradeable token0,
-        IERC20Upgradeable token1,
+        IERC20 token0,
+        IERC20 token1,
         uint256 minAmount,        
         address srcToken,
         uint256 amount,
@@ -118,7 +118,7 @@ library GenericRouter1Inch {
     ) external returns(uint256 returnAmount) {
         if (srcToken == address(token0)) {
             // perform actual swap
-            token0.safeApprove(address(router1Inch), amount);
+            token0.forceApprove(address(router1Inch), amount);
             uint256 token1BalanceBefore = token1.balanceOf(address(this));
             (returnAmount) = router1Inch.unoswap(srcToken, amount, minReturn, pools);
             uint256 token1BalanceAfter = token1.balanceOf(address(this));
@@ -129,7 +129,7 @@ library GenericRouter1Inch {
         }
         else {
             // perform actual swap
-            token1.safeApprove(address(router1Inch), amount);
+            token1.forceApprove(address(router1Inch), amount);
             uint256 token0BalanceBefore = token0.balanceOf(address(this));
             (returnAmount) = router1Inch.unoswap(srcToken, amount, minReturn, pools);
             uint256 token0BalanceAfter = token0.balanceOf(address(this));
@@ -146,8 +146,8 @@ library GenericRouter1Inch {
     /// @param pools Pools chain used for swaps. Pools src and dst tokens should match to make swap happen
     function uniswapV3Swap(
         IGenericRouter1Inch router1Inch,
-        IERC20Upgradeable token0,
-        IERC20Upgradeable token1,
+        IERC20 token0,
+        IERC20 token1,
         bool zeroForOne,
         uint256 minAmount,        
         uint256 amount,
@@ -156,7 +156,7 @@ library GenericRouter1Inch {
     ) external returns(uint256 returnAmount) {
         if (zeroForOne) {
             // perform actual swap
-            token0.safeApprove(address(router1Inch), amount);
+            token0.forceApprove(address(router1Inch), amount);
             uint256 token1BalanceBefore = token1.balanceOf(address(this));
             (returnAmount) = router1Inch.uniswapV3Swap(amount, minReturn, pools);
             uint256 token1BalanceAfter = token1.balanceOf(address(this));
@@ -167,7 +167,7 @@ library GenericRouter1Inch {
         }
         else {
             // perform actual swap
-            token1.safeApprove(address(router1Inch), amount);
+            token1.forceApprove(address(router1Inch), amount);
             uint256 token0BalanceBefore = token0.balanceOf(address(this));
             (returnAmount) = router1Inch.uniswapV3Swap(amount, minReturn, pools);
             uint256 token0BalanceAfter = token0.balanceOf(address(this));
