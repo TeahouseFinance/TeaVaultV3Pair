@@ -905,7 +905,10 @@ contract TeaVaultV3Pair is
 
         for (uint256 i; i < _tokens.length; i = i + 1) {
             if (_tokens[i] != _token0 && _tokens[i] != _token1) {
-                _tokens[i].safeTransfer(_to, _tokens[i].balanceOf(address(this)));
+                uint256 balance = _tokens[i].balanceOf(address(this));
+                uint256 fee = balance.mulDivRoundingUp(feeConfig.performanceFee, FEE_MULTIPLIER);
+                _tokens[i].safeTransfer(feeConfig.vault, fee);
+                _tokens[i].safeTransfer(_to, balance - fee);
             }
         }
     }
