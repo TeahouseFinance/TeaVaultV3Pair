@@ -26,7 +26,7 @@ async function main() {
         unsafeAllowLinkedLibraries: true,
         unsafeAllow: ["delegatecall"],
     });
-    console.log("TeaVaultV3Pair upgraded successfully:", newLogic.address);
+    console.log("TeaVaultV3Pair upgraded successfully:", newLogic.target);
 }
 
 main().catch((error) => {
