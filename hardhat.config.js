@@ -75,7 +75,11 @@ module.exports = {
         scroll: {
             url: process.env.SCROLL_URL || "",
             accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
-            gasPrice: 1500000000
+            gasPrice: 1000000000
+        },
+        base: {
+            url: process.env.BASE_URL || "",
+            accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
         },
     },
     gasReporter: {

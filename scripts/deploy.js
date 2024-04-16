@@ -65,7 +65,7 @@ async function main() {
             unsafeAllow: ["delegatecall"],
         }
     );
-    console.log("Vault depolyed", vault.address);
+    console.log("Vault depolyed", vault.target);
 
     await vault.assignManager(manager);
     console.log("Manager set!");
