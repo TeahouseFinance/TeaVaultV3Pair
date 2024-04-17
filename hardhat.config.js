@@ -81,6 +81,10 @@ module.exports = {
             url: process.env.BASE_URL || "",
             accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
         },
+        linea: {
+            url: process.env.LINEA_URL || "",
+            accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+        }
     },
     gasReporter: {
         enabled: process.env.REPORT_GAS !== undefined,
@@ -107,6 +111,14 @@ module.exports = {
                     apiURL: "https://api.scrollscan.com/api",
                     browserURL: "https://scrollscan.com/"
                 }
+            },
+            {
+                network: "linea",
+                chainId: 59144,
+                urls: {
+                    apiURL: "https://api.lineascan.build/api",
+                    browserURL: "https://lineascan.build",
+                },
             }
         ]
     }
