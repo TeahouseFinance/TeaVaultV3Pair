@@ -84,6 +84,10 @@ module.exports = {
         linea: {
             url: process.env.LINEA_URL || "",
             accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+        },
+        bsc: {
+            url: process.env.BSC_URL || "",
+            accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
         }
     },
     gasReporter: {
