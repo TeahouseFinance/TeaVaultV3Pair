@@ -61,11 +61,11 @@ async function main() {
     console.log("GenericRouter1Inch used", genericRouter1Inch);
     console.log("Vault depolyed", vault.target);
 
-    await vault.assignManager(manager, {gasLimit: 1000000n});
+    await vault.assignManager(manager, {gasLimit: 300000n});
     console.log("Manager set!");
-    await vault.assignRouter1Inch(oneInchRouter, {gasLimit: 1000000n});
+    await vault.assignRouter1Inch(oneInchRouter, {gasLimit: 300000n});
     console.log("1inchRouter set!");
-    await vault.transferOwnership(owner, {gasLimit: 1000000n});
+    await vault.transferOwnership(owner, {gasLimit: 300000n});
     console.log("Ownership transfered!");
 }
 
