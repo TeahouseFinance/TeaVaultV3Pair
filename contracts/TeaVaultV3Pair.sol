@@ -21,6 +21,7 @@ import "@uniswap/v3-periphery/contracts/libraries/PoolAddress.sol";
 
 import "./interface/ITeaVaultV3Pair.sol";
 import "./interface/IGenericRouter1Inch.sol";
+import "./interface/INileGauge.sol";
 import "./library/VaultUtils.sol";
 import "./library/GenericRouter1Inch.sol";
 
@@ -501,7 +502,7 @@ contract TeaVaultV3Pair is
         emit AddLiquidity(address(pool), _tickLower, _tickUpper, _liquidity, amount0, amount1);
     }
 
-    function uniswapV3MintCallback(uint256 _amount0Owed, uint256 _amount1Owed, bytes calldata _data) external {
+    function ramsesV2MintCallback(uint256 _amount0Owed, uint256 _amount1Owed, bytes calldata _data) external {
         if (callbackStatus != 2) revert InvalidCallbackStatus();
         if (address(pool) != msg.sender) revert InvalidCallbackCaller();
 
@@ -596,7 +597,7 @@ contract TeaVaultV3Pair is
         emit Swap(_zeroForOne, false, amountIn, _amountOut);
     }
 
-    function uniswapV3SwapCallback(int256 _amount0Delta, int256 _amount1Delta, bytes calldata _data) external {
+    function ramsesV2SwapCallback(int256 _amount0Delta, int256 _amount1Delta, bytes calldata _data) external {
         if (callbackStatus != 2) revert InvalidCallbackStatus();
         if (address(pool) != msg.sender) revert InvalidCallbackCaller();
         if (_amount0Delta == 0 || _amount1Delta == 0) revert SwapInZeroLiquidityRegion();
@@ -897,19 +898,29 @@ contract TeaVaultV3Pair is
         rewardClaimer = _rewardClaimer;
     }
 
-    function withdrawRewards(ERC20Upgradeable[] calldata _tokens, address _to) external nonReentrant {
-        if (msg.sender != rewardClaimer) revert();
+    function claimAndForwardReward(INileGauge _gauge, address _to) external onlyRewardClaimer nonReentrant {
+        address[] memory rewardTokens = _gauge.getRewardTokens();
+
+        uint256 positionLength = positions.length;
+        for (uint256 i; i < positionLength;) {
+            Position storage position = positions[i];
+            _gauge.getReward(address(this), 0, position.tickLower, position.tickUpper, rewardTokens, address(this));
+
+            unchecked { i = i + 1; }
+        }
 
         ERC20Upgradeable _token0 = token0;
         ERC20Upgradeable _token1 = token1;
-
-        for (uint256 i; i < _tokens.length; i = i + 1) {
-            if (_tokens[i] != _token0 && _tokens[i] != _token1) {
-                uint256 balance = _tokens[i].balanceOf(address(this));
+        for (uint256 i; i < rewardTokens.length;) {
+            ERC20Upgradeable rewardToken = ERC20Upgradeable(rewardTokens[i]);
+            if (rewardToken != _token0 && rewardToken != _token1) {
+                uint256 balance = rewardToken.balanceOf(address(this));
                 uint256 fee = balance.mulDivRoundingUp(feeConfig.performanceFee, FEE_MULTIPLIER);
-                _tokens[i].safeTransfer(feeConfig.vault, fee);
-                _tokens[i].safeTransfer(_to, balance - fee);
+                rewardToken.safeTransfer(feeConfig.vault, fee);
+                rewardToken.safeTransfer(_to, balance - fee);
             }
+
+            unchecked { i = i + 1; }
         }
     }
 
@@ -920,6 +931,11 @@ contract TeaVaultV3Pair is
      */
     modifier onlyManager() {
         if (msg.sender != manager) revert CallerIsNotManager();
+        _;
+    }
+
+    modifier onlyRewardClaimer() {
+        if (msg.sender != rewardClaimer) revert CallerIsNotRewardClaimer();
         _;
     }
 

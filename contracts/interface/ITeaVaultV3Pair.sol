@@ -14,6 +14,7 @@ interface ITeaVaultV3Pair {
     error PositionDoesNotExist();
     error ZeroLiquidity();
     error CallerIsNotManager();
+    error CallerIsNotRewardClaimer();
     error InvalidCallbackStatus();
     error InvalidCallbackCaller();
     error SwapInZeroLiquidityRegion();

@@ -51,18 +51,19 @@ library VaultUtils {
         IUniswapV3Pool pool,
         ITeaVaultV3Pair.Position storage position
     ) external view returns (uint256 amount0, uint256 amount1, uint256 fee0, uint256 fee1) {
-        bytes32 positionKey = keccak256(abi.encodePacked(vault, position.tickLower, position.tickUpper));
+        bytes32 positionKey = keccak256(abi.encodePacked(vault, uint256(0), position.tickLower, position.tickUpper));
         (uint160 sqrtPriceX96, int24 tick, , , , , ) = pool.slot0();
         uint256 feeGrowthGlobal0X128 = pool.feeGrowthGlobal0X128();
         uint256 feeGrowthGlobal1X128 = pool.feeGrowthGlobal1X128();
-        (, , uint256 feeGrowthOutside0X128Lower, uint256 feeGrowthOutside1X128Lower, , , , ) = pool.ticks(position.tickLower);
-        (, , uint256 feeGrowthOutside0X128Upper, uint256 feeGrowthOutside1X128Upper, , , , ) = pool.ticks(position.tickUpper);
+        (, , , , uint256 feeGrowthOutside0X128Lower, uint256 feeGrowthOutside1X128Lower, , , , ) = pool.ticks(position.tickLower);
+        (, , , , uint256 feeGrowthOutside0X128Upper, uint256 feeGrowthOutside1X128Upper, , , , ) = pool.ticks(position.tickUpper);
         (
             uint128 liquidity,
             uint256 feeGrowthInside0Last,
             uint256 feeGrowthInside1Last,
             uint128 tokensOwed0,
-            uint128 tokensOwed1
+            uint128 tokensOwed1,
+
         ) = pool.positions(positionKey);
 
         (amount0, amount1) = LiquidityAmounts.getAmountsForLiquidity(
