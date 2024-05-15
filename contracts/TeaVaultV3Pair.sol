@@ -64,10 +64,9 @@ contract TeaVaultV3Pair is
 
     // LXP-L distribution
     ERC20Upgradeable public lxpL;
-    // IRewardCounter public rewardCounter;
     uint256 private lastRewardBalance;
 
-    uint256 private X36 = 10 ** 36;
+    uint256 private X36;
     uint256 private rewardsPerShareX36;
     mapping(address => IRewardCounter.UserData) private userData;
 
@@ -936,6 +935,7 @@ contract TeaVaultV3Pair is
 
     function setUpLxpL(ERC20Upgradeable _lxpL) external onlyOwner {
         if (address(lxpL) != address(0)) revert();
+        X36 = 10 ** 36;
         lxpL = _lxpL;
         uint256 balance = _lxpL.balanceOf(address(this));
         lastRewardBalance = balance;
