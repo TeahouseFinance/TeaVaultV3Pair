@@ -29,7 +29,7 @@ module.exports = {
             viaIR: true,
             optimizer: {
                 enabled: true,
-                runs: 200,
+                runs: 1,
             },
             // debug: {
             //     revertStrings: "strip",
