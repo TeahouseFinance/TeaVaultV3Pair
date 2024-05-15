@@ -2,12 +2,13 @@
 // Teahouse Finance
 pragma solidity =0.8.25;
 
-import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+// import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 import "@uniswap/v3-periphery/contracts/libraries/LiquidityAmounts.sol";
 import "@uniswap/v3-core/contracts/libraries/FixedPoint96.sol";
 import "@uniswap/v3-core/contracts/libraries/FixedPoint128.sol";
 
+import "../interface/IUniswapV3Pool.sol";
 import "../interface/ITeaVaultV3Pair.sol";
 
 library VaultUtils {

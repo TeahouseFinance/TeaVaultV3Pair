@@ -14,11 +14,11 @@ import "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 
 import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
-import "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 import "@uniswap/v3-core/contracts/libraries/FullMath.sol";
 import "@uniswap/v3-periphery/contracts/libraries/PoolAddress.sol";
 
+import "./interface/IUniswapV3Pool.sol";
 import "./interface/ITeaVaultV3Pair.sol";
 import "./interface/IGenericRouter1Inch.sol";
 import "./interface/INileGauge.sol";
@@ -934,13 +934,9 @@ contract TeaVaultV3Pair is
         }
     }
 
-    // ERC20Upgradeable public lxpL;
-    // IRewardCounter public rewardCounter;
-    // uint256 lastRewardBalance;
     function setUpLxpL(ERC20Upgradeable _lxpL) external onlyOwner {
         if (address(lxpL) != address(0)) revert();
         lxpL = _lxpL;
-        // rewardCounter = _rewardCounter;
         uint256 balance = _lxpL.balanceOf(address(this));
         lastRewardBalance = balance;
         rewardsPerShareX36 = balance.mulDiv(X36, totalSupply());
@@ -954,24 +950,19 @@ contract TeaVaultV3Pair is
 
     function claim() external nonReentrant returns (uint256 amount) {
         _onReceiveRewards();
-        // amount = rewardCounter.claim(msg.sender, balanceOf(msg.sender));
-
         _updateUserData(msg.sender, balanceOf(msg.sender));
         amount = userData[msg.sender].unclaimedRewards;
         userData[msg.sender].unclaimedRewards = 0;
 
-
         ERC20Upgradeable _lxpL = lxpL;
         _lxpL.transfer(msg.sender, amount);
         lastRewardBalance = _lxpL.balanceOf(address(this));
-        // amount = _claim(msg.sender);
     }
 
     function _onReceiveRewards() internal {
         uint256 balance = lxpL.balanceOf(address(this));
         uint256 _lastRewardBalance = lastRewardBalance;
         if (balance > _lastRewardBalance) {
-            // rewardCounter.onReceiveRewards(balance - _lastRewardBalance, totalSupply());
             rewardsPerShareX36 += (balance - _lastRewardBalance).mulDiv(X36, totalSupply());
             lastRewardBalance = balance;
         }
@@ -979,17 +970,11 @@ contract TeaVaultV3Pair is
 
     function _update(address from, address to, uint256 value) internal override {
         _onReceiveRewards();
-        // IRewardCounter _rewardCounter = rewardCounter;
-        // _rewardCounter.onUpdateShares(from, balanceOf(from));
-        // _rewardCounter.onUpdateShares(to, balanceOf(to));
-
         if (address(from) != address(0)) {
             _updateUserData(from, balanceOf(from));
-            // _rewardCounter.onUpdateShares(from, balanceOf(from));
         }
         if (address(to) != address(0)) {
             _updateUserData(to, balanceOf(to));
-            // _rewardCounter.onUpdateShares(to, balanceOf(to));
         }
 
         super._update(from, to, value);
