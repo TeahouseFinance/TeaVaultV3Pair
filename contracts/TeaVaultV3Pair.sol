@@ -63,7 +63,7 @@ contract TeaVaultV3Pair is
     address public rewardClaimer;
 
     // LXP-L distribution
-    ERC20Upgradeable public lxpL;
+    address public lxpL;
     uint256 private lastRewardBalance;
 
     uint256 private X36;
@@ -933,13 +933,17 @@ contract TeaVaultV3Pair is
         }
     }
 
-    function setUpLxpL(ERC20Upgradeable _lxpL) external onlyOwner {
-        if (address(lxpL) != address(0)) revert();
+    function setUpLxpL(address _lxpL) external onlyOwner {
+        if (lxpL != address(0)) revert();
         X36 = 10 ** 36;
         lxpL = _lxpL;
-        uint256 balance = _lxpL.balanceOf(address(this));
+        uint256 balance = _lxpBalance();
         lastRewardBalance = balance;
         rewardsPerShareX36 = balance.mulDiv(X36, totalSupply());
+    }
+
+    function _lxpBalance() internal view returns (uint256) {
+        return ERC20Upgradeable(lxpL).balanceOf(address(this));
     }
 
     function _updateUserData(address _owner, uint256 _oldShares) internal {
@@ -954,27 +958,31 @@ contract TeaVaultV3Pair is
         amount = userData[msg.sender].unclaimedRewards;
         userData[msg.sender].unclaimedRewards = 0;
 
-        ERC20Upgradeable _lxpL = lxpL;
-        _lxpL.transfer(msg.sender, amount);
-        lastRewardBalance = _lxpL.balanceOf(address(this));
+        if (amount > 0) {
+            // lastRewardBalance is updated in _onReceiveRewards()
+            ERC20Upgradeable(lxpL).transfer(msg.sender, amount);
+            lastRewardBalance = lastRewardBalance - amount;
+        }
     }
 
     function _onReceiveRewards() internal {
-        uint256 balance = lxpL.balanceOf(address(this));
-        uint256 _lastRewardBalance = lastRewardBalance;
-        if (balance > _lastRewardBalance) {
-            rewardsPerShareX36 += (balance - _lastRewardBalance).mulDiv(X36, totalSupply());
+        uint256 balance = _lxpBalance();
+        if (balance > lastRewardBalance) {
+            rewardsPerShareX36 += (balance - lastRewardBalance).mulDiv(X36, totalSupply());
             lastRewardBalance = balance;
         }
     }
 
     function _update(address from, address to, uint256 value) internal override {
-        _onReceiveRewards();
-        if (address(from) != address(0)) {
-            _updateUserData(from, balanceOf(from));
-        }
-        if (address(to) != address(0)) {
-            _updateUserData(to, balanceOf(to));
+        // X36 will be initialized to 10 ** 36 in setUpLxpL()
+        if (X36 != 0) {
+            _onReceiveRewards();
+            if (from != address(0)) {
+                _updateUserData(from, balanceOf(from));
+            }
+            if (to != address(0)) {
+                _updateUserData(to, balanceOf(to));
+            }
         }
 
         super._update(from, to, value);
