@@ -204,6 +204,13 @@ async function main() {
 
     // check claim states
     for (let i = 0; i < shares.length; i++) {
+        if (i != 0) {
+            const rewardBalance = await rewardToken.balanceOf(signers[i].address);
+            if (claimed[i] != rewardBalance) {
+                throw "Claimed[i] != rewardBalance";
+            }
+        }
+
         const claimable = await vault.connect(vault.runner.provider).claim.staticCall({ from: signers[i].address });
         claimed[i] += claimable;
 
