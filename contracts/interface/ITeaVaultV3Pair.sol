@@ -23,6 +23,7 @@ interface ITeaVaultV3Pair {
     error InvalidSwapReceiver();
     error InsufficientSwapResult(uint256 minAmount, uint256 convertedAmount);
     error InvalidTokenOrder();
+    error ZeroAddress();
 
     event TeaVaultV3PairCreated(address indexed teaVaultAddress);
     event FeeConfigChanged(address indexed sender, uint256 timestamp, FeeConfig feeConfig);
@@ -35,6 +36,8 @@ interface ITeaVaultV3Pair {
     event Collect(address indexed pool, int24 tickLower, int24 tickUpper, uint256 amount0, uint256 amount1);
     event CollectSwapFees(address indexed pool, uint256 amount0, uint256 amount1, uint256 feeAmount0, uint256 feeAmount1);
     event Swap(bool indexed zeroForOne, bool indexed exactInput, uint256 amountIn, uint256 amountOut);
+    event rewardClaimerSet(address indexed claimer);
+    event rewardClaimed(address indexed to);
 
     /// @notice Fee config structure
     /// @param vault Fee goes to this address

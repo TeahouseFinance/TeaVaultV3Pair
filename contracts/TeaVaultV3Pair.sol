@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 // Teahouse Finance
 
-pragma solidity =0.8.25;
+pragma solidity =0.8.26;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
@@ -904,10 +904,14 @@ contract TeaVaultV3Pair is
     }
 
     function setRewardClaimer(address _rewardClaimer) external onlyOwner {
+        if (_rewardClaimer == address(0)) revert ZeroAddress();
         rewardClaimer = _rewardClaimer;
+
+        emit rewardClaimerSet(_rewardClaimer);
     }
 
     function claimAndForwardReward(INileGauge _gauge, address _to) external onlyRewardClaimer nonReentrant {
+        if (_to == address(0)) revert ZeroAddress();
         address[] memory rewardTokens = _gauge.getRewardTokens();
 
         uint256 positionLength = positions.length;
@@ -931,6 +935,8 @@ contract TeaVaultV3Pair is
 
             unchecked { i = i + 1; }
         }
+
+        emit rewardClaimed(_to);
     }
 
     function setUpLxpL(address _lxpL) external onlyOwner {
