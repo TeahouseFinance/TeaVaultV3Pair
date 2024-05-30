@@ -24,6 +24,8 @@ interface ITeaVaultV3Pair {
     error InsufficientSwapResult(uint256 minAmount, uint256 convertedAmount);
     error InvalidTokenOrder();
     error ZeroAddress();
+    error InvalidToken();
+    error LxpLAlreadySet();
 
     event TeaVaultV3PairCreated(address indexed teaVaultAddress);
     event FeeConfigChanged(address indexed sender, uint256 timestamp, FeeConfig feeConfig);

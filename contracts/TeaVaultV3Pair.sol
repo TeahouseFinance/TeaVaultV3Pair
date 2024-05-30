@@ -928,9 +928,11 @@ contract TeaVaultV3Pair is
             ERC20Upgradeable rewardToken = ERC20Upgradeable(rewardTokens[i]);
             if (rewardToken != _token0 && rewardToken != _token1) {
                 uint256 balance = rewardToken.balanceOf(address(this));
-                uint256 fee = balance.mulDivRoundingUp(feeConfig.performanceFee, FEE_MULTIPLIER);
-                rewardToken.safeTransfer(feeConfig.vault, fee);
-                rewardToken.safeTransfer(_to, balance - fee);
+                if (balance > 0) {
+                    uint256 fee = balance.mulDivRoundingUp(feeConfig.performanceFee, FEE_MULTIPLIER);
+                    rewardToken.safeTransfer(feeConfig.vault, fee);
+                    rewardToken.safeTransfer(_to, balance - fee);
+                }
             }
 
             unchecked { i = i + 1; }
@@ -940,12 +942,12 @@ contract TeaVaultV3Pair is
     }
 
     function setUpLxpL(address _lxpL) external onlyOwner {
-        if (lxpL != address(0)) revert();
+        if (_lxpL != address(0)) revert ZeroAddress();
+        if (_lxpL == address(token0) || _lxpL == address(token1)) revert InvalidToken();
+        if (lxpL != address(0)) revert LxpLAlreadySet();
         X36 = 10 ** 36;
         lxpL = _lxpL;
-        uint256 balance = _lxpBalance();
-        lastRewardBalance = balance;
-        rewardsPerShareX36 = balance.mulDiv(X36, totalSupply());
+        _onReceiveRewards();
     }
 
     function _lxpBalance() internal view returns (uint256) {
