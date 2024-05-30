@@ -928,8 +928,8 @@ contract TeaVaultV3Pair is
             ERC20Upgradeable rewardToken = ERC20Upgradeable(rewardTokens[i]);
             if (rewardToken != _token0 && rewardToken != _token1) {
                 uint256 balance = rewardToken.balanceOf(address(this));
-                if (balance > 0) {
-                    uint256 fee = balance.mulDivRoundingUp(feeConfig.performanceFee, FEE_MULTIPLIER);
+                uint256 fee = balance.mulDivRoundingUp(feeConfig.performanceFee, FEE_MULTIPLIER);
+                if (balance > fee) {
                     rewardToken.safeTransfer(feeConfig.vault, fee);
                     rewardToken.safeTransfer(_to, balance - fee);
                 }
