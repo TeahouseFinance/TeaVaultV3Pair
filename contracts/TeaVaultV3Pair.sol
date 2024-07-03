@@ -910,22 +910,16 @@ contract TeaVaultV3Pair is
         emit rewardClaimerSet(_rewardClaimer);
     }
 
-    function claimAndForwardReward(INileGauge _gauge, address _to) external onlyRewardClaimer nonReentrant {
+    function withdrawRewards(
+        ERC20Upgradeable[] calldata _tokens,
+        address _to
+    ) external onlyRewardClaimer nonReentrant {
         if (_to == address(0)) revert ZeroAddress();
-        address[] memory rewardTokens = _gauge.getRewardTokens();
-
-        uint256 positionLength = positions.length;
-        for (uint256 i; i < positionLength;) {
-            Position storage position = positions[i];
-            _gauge.getReward(address(this), 0, position.tickLower, position.tickUpper, rewardTokens, address(this));
-
-            unchecked { i = i + 1; }
-        }
 
         ERC20Upgradeable _token0 = token0;
         ERC20Upgradeable _token1 = token1;
-        for (uint256 i; i < rewardTokens.length;) {
-            ERC20Upgradeable rewardToken = ERC20Upgradeable(rewardTokens[i]);
+        for (uint256 i; i < _tokens.length;) {
+            ERC20Upgradeable rewardToken = ERC20Upgradeable(_tokens[i]);
             if (rewardToken != _token0 && rewardToken != _token1) {
                 uint256 balance = rewardToken.balanceOf(address(this));
                 uint256 fee = balance.mulDivRoundingUp(feeConfig.performanceFee, FEE_MULTIPLIER);
@@ -939,61 +933,6 @@ contract TeaVaultV3Pair is
         }
 
         emit rewardClaimed(_to);
-    }
-
-    function setUpLxpL(address _lxpL) external onlyOwner {
-        if (_lxpL != address(0)) revert ZeroAddress();
-        if (_lxpL == address(token0) || _lxpL == address(token1)) revert InvalidToken();
-        if (lxpL != address(0)) revert LxpLAlreadySet();
-        X36 = 10 ** 36;
-        lxpL = _lxpL;
-        _onReceiveRewards();
-    }
-
-    function _lxpBalance() internal view returns (uint256) {
-        return ERC20Upgradeable(lxpL).balanceOf(address(this));
-    }
-
-    function _updateUserData(address _owner, uint256 _oldShares) internal {
-        uint256 rewards = (rewardsPerShareX36 - userData[_owner].lastRewardPerShareX36).mulDiv(_oldShares, X36);
-        userData[_owner].unclaimedRewards += rewards;
-        userData[_owner].lastRewardPerShareX36 = rewardsPerShareX36;
-    }
-
-    function claim() external nonReentrant returns (uint256 amount) {
-        _onReceiveRewards();
-        _updateUserData(msg.sender, balanceOf(msg.sender));
-        amount = userData[msg.sender].unclaimedRewards;
-        userData[msg.sender].unclaimedRewards = 0;
-
-        if (amount > 0) {
-            // lastRewardBalance is updated in _onReceiveRewards()
-            ERC20Upgradeable(lxpL).transfer(msg.sender, amount);
-            lastRewardBalance = lastRewardBalance - amount;
-        }
-    }
-
-    function _onReceiveRewards() internal {
-        uint256 balance = _lxpBalance();
-        if (balance > lastRewardBalance) {
-            rewardsPerShareX36 += (balance - lastRewardBalance).mulDiv(X36, totalSupply());
-            lastRewardBalance = balance;
-        }
-    }
-
-    function _update(address from, address to, uint256 value) internal override {
-        // X36 will be initialized to 10 ** 36 in setUpLxpL()
-        if (X36 != 0) {
-            _onReceiveRewards();
-            if (from != address(0)) {
-                _updateUserData(from, balanceOf(from));
-            }
-            if (to != address(0)) {
-                _updateUserData(to, balanceOf(to));
-            }
-        }
-
-        super._update(from, to, value);
     }
 
     // modifiers
